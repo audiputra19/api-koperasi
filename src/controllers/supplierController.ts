@@ -49,3 +49,21 @@ export const getSupplierController = async (req: Request, res: Response) => {
         res.status(400).json({ message: 'terjadi kesalahan pada server' });
     }
 }
+
+export const searchSupplierController = async (req: Request, res: Response) => {
+    const search = req.query.q || '';
+
+    if (!search) return res.json([]);
+
+    try {
+        const [rows] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT kode, nama, alamat FROM supplier WHERE nama LIKE ?`,
+            [`%${search}%`]
+        )
+        const supplier = rows as Supplier[];
+
+        res.status(200).json(supplier);
+    } catch (error) {
+        res.status(400).json({ message: "Terjadi kesalahan pada server" })
+    }
+}

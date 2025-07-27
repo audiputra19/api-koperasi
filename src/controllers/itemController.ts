@@ -79,8 +79,7 @@ export const searchItemController = async (req: Request, res: Response) => {
 
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT kode, barcode, nama, stok, satuan, rak, jenis, harga_beli as hargaBeli, 
-                harga_jual as hargaJual, hpp, stok_minimal as stokMinimal, status
+            `SELECT kode as kodeItem, barcode, nama as namaItem, jenis, stok as jumlah, satuan, harga_jual as harga
             FROM items 
             WHERE status <> '2' AND (barcode LIKE ? OR nama LIKE ?)
             ORDER BY kode ASC`,
