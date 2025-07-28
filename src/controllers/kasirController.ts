@@ -23,10 +23,13 @@ const generateIdTransaction = async () => {
 
     return `${code}/KSR/KOPSA/${date}/${year}`;
 }
+
 export const inputKasirController = async (req: Request, res: Response) => {
     const { dataKasir, dataPelanggan, total, metode, startDate, userBuat } = req.body;
 
-    try {
+    try { 
+        if(dataKasir.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
+        
         const idTransaction = await generateIdTransaction();
         await connKopsas.query<RowDataPacket[]>(
             `INSERT INTO kasir 
@@ -60,6 +63,7 @@ export const updateKasirController = async (req: Request, res: Response) => {
     const { idTransaksi, dataKasir, dataPelanggan, total, metode, startDate, userBuat } = req.body;
 
     try {
+        if(dataKasir.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
 
         await connKopsas.query<RowDataPacket[]>(
             `UPDATE kasir 
@@ -68,6 +72,11 @@ export const updateKasirController = async (req: Request, res: Response) => {
             [startDate, dataPelanggan.kodePelanggan, dataPelanggan.namaPelanggan, total, userBuat, 
             metode, idTransaksi]
         )
+
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM kasir_detail WHERE id_transaksi = ?`,
+            [idTransaksi]
+        );
 
         for (const item of dataKasir) {
             await connKopsas.query<RowDataPacket[]>(
@@ -145,6 +154,41 @@ export const getKasirDetailController = async (req: Request, res: Response) => {
 
         res.status(200).json(dataKasirDetail);
     } catch (error) {
-        res.status(400).json({ message: 'Terjadi kesalahan pada server' })
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });
+    }
+}
+
+export const deleteKasirController = async (req: Request, res: Response) => {
+    const { idTransaksi } = req.body;
+
+    try {
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM kasir WHERE id_transaksi = ?`, [idTransaksi]
+        );
+
+        res.status(200).json({ message: 'Data berhasil dihapus' });
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    }
+}
+
+export const deleteKasirDetailController = async (req: Request, res: Response) => {
+    const { idTransaksi, kdItem, total } = req.body;
+
+    try {
+        await connKopsas.query<RowDataPacket[]>(
+            `UPDATE kasir 
+            SET total = total - ? 
+            WHERE id_transaksi = ?`, 
+            [total, idTransaksi]
+        );
+
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM kasir_detail WHERE id_transaksi = ? AND kd_item = ?`, [idTransaksi, kdItem]
+        );
+
+        res.status(200).json({ message: 'Data berhasil dihapus' });
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
     }
 }

@@ -27,6 +27,8 @@ export const inputPembelianController = async (req: Request, res: Response) => {
     const { dataPembelian, dataSupplier, total, metode, startDate, userBuat } = req.body;
 
     try {
+        if(dataPembelian.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
+
         const idTransaction = await generateIdTransaction();
         await connKopsas.query<RowDataPacket[]>(
             `INSERT INTO pembelian 
@@ -60,6 +62,7 @@ export const updatePembelianController = async (req: Request, res: Response) => 
     const { idTransaksi, dataPembelian, dataSupplier, total, metode, startDate, userBuat } = req.body;
 
     try {
+        if(dataPembelian.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
 
         await connKopsas.query<RowDataPacket[]>(
             `UPDATE pembelian 
@@ -67,6 +70,11 @@ export const updatePembelianController = async (req: Request, res: Response) => 
             WHERE id_transaksi = ?`, 
             [startDate, dataSupplier.kodeSupplier, dataSupplier.namaSupplier, total, userBuat, 
             metode, idTransaksi]
+        )
+
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM pembelian_detail WHERE id_transaksi = ?`,
+            [idTransaksi]
         )
 
         for (const item of dataPembelian) {
@@ -146,5 +154,40 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
         res.status(200).json(dataPembelianDetail);
     } catch (error) {
         res.status(400).json({ message: 'Terjadi kesalahan pada server' })
+    }
+}
+
+export const deletePembelianController = async (req: Request, res: Response) => {
+    const { idTransaksi } = req.body;
+
+    try {
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM pembelian WHERE id_transaksi = ?`, [idTransaksi]
+        );
+
+        res.status(200).json({ message: 'Data berhasil dihapus' });
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    }
+}
+
+export const deletePembelianDetailController = async (req: Request, res: Response) => {
+    const { idTransaksi, kdItem, total } = req.body;
+
+    try {
+        await connKopsas.query<RowDataPacket[]>(
+            `UPDATE pembelian 
+            SET total = total - ? 
+            WHERE id_transaksi = ?`, 
+            [total, idTransaksi]
+        );
+
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM pembelian_detail WHERE id_transaksi = ? AND kd_item = ?`, [idTransaksi, kdItem]
+        );
+
+        res.status(200).json({ message: 'Data berhasil dihapus' });
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
     }
 }
