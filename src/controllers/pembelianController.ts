@@ -40,9 +40,9 @@ export const inputPembelianController = async (req: Request, res: Response) => {
         for (const item of dataPembelian) {
             await connKopsas.query<RowDataPacket[]>(
                 `INSERT INTO pembelian_detail
-                (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [idTransaction, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga]
+                (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [idTransaction, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
             )
 
             await connKopsas.query<RowDataPacket[]>(
@@ -80,9 +80,9 @@ export const updatePembelianController = async (req: Request, res: Response) => 
         for (const item of dataPembelian) {
             await connKopsas.query<RowDataPacket[]>(
                 `INSERT INTO pembelian_detail
-                (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [idTransaksi, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga]
+                (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [idTransaksi, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
             )
 
             await connKopsas.query<RowDataPacket[]>(
@@ -131,7 +131,8 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
             `SELECT pembelian_detail.id_transaksi, items.barcode, pembelian_detail.kd_item, pembelian_detail.nama_item, 
-                    pembelian_detail.jenis, pembelian_detail.jumlah, pembelian_detail.satuan, pembelian_detail.harga
+                    pembelian_detail.jenis, pembelian_detail.jumlah, pembelian_detail.satuan, pembelian_detail.harga,
+                    pembelian_detail.expired_date
             FROM pembelian_detail 
             INNER JOIN items ON items.kode = pembelian_detail.kd_item 
             WHERE id_transaksi = ? 
@@ -148,6 +149,7 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
                 jumlah: item.jumlah,
                 satuan: item.satuan,
                 harga: item.harga,
+                expiredDate: item.expired_date
             }
         });
 

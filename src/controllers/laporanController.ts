@@ -5,18 +5,26 @@ import { Request, Response } from "express";
 import moment from "moment";
 
 export const getLaporanController = async (req: Request, res: Response) => {
-    const {date1, date2} = req.body;
+    const {date1, date2, kdPelanggan} = req.body;
     const tanggal1 = moment(date1).format("YYYY-MM-DD"); 
     const tanggal2 = moment(date2).format("YYYY-MM-DD");
 
     try {
-        const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * 
-            FROM kasir
+        let query = `
+            SELECT * 
+            FROM kasir 
             WHERE DATE(tanggal) BETWEEN ? AND ?
-            ORDER BY id_transaksi`,
-            [tanggal1, tanggal2]
-        );
+        `;
+        const params: any[] = [tanggal1, tanggal2];
+
+        if (kdPelanggan !== "undefined") {
+            query += ` AND kd_pelanggan = ?`;
+            params.push(kdPelanggan);
+        }
+
+        query += ` ORDER BY id_transaksi`;
+
+        const [rows] = await connKopsas.query<RowDataPacket[]>(query, params);
         const laporan = rows as Kasir[];
 
         const dataLaporan = laporan.map(item => {

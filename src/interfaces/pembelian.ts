@@ -17,4 +17,5 @@ export interface PembelianDetail {
     jumlah: number;
     satuan: string;
     harga: number;
+    expired_date: string;
 }

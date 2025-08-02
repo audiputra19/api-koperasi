@@ -3,4 +3,5 @@ export interface Pelanggan {
     nama: string;
     idKategori: number;
     limitBelanja: number;
+    kredit: number;
 }

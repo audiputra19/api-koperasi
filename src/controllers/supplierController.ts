@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import connKopsas from "../config/db/kopsas";
 import { RowDataPacket } from "mysql2";
 import { Supplier } from "../interfaces/supplier";
+import moment from "moment";
 
 interface MaxCodeRow extends RowDataPacket {
     maxCode: number | null;
@@ -21,16 +22,31 @@ const generateSupplierCode = async () => {
 }
 
 export const inputSupplierController = async (req: Request, res: Response) => {
-    const {nama, alamat} = req.body;
+    const {kdSupp, nama, alamat} = req.body;
+    const date = moment().format("YYYY-MM-DD HH:mm:ss");
 
     try {
         const kode = await generateSupplierCode();
 
-        await connKopsas.query<RowDataPacket[]>(
-            `INSERT INTO supplier (kode, nama, alamat) 
-            VALUES (?, ?, ?)`,
-            [kode, nama, alamat]
-        )
+        const [rowsSupplier] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT * FROM supplier WHERE kode = ?`, 
+            [kode]
+        );
+
+        if(rowsSupplier.length > 0) {
+            await connKopsas.query<RowDataPacket[]>(
+                `UPDATE supplier 
+                SET nama = ?, alamat = ?
+                WHERE kode = ?`,
+                [nama, alamat, kdSupp]
+            );
+        } else {
+            await connKopsas.query<RowDataPacket[]>(
+                `INSERT INTO supplier (kode, nama, alamat, tanggal) 
+                VALUES (?, ?, ?, ?)`,
+                [kode, nama, alamat, date]
+            )
+        }
 
         res.status(200).json({ message: 'supplier berhasil ditambahkan' });
     } catch (error) {
