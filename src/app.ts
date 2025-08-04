@@ -14,7 +14,8 @@ import dashboardRouter from "./routers/dashboardRoutes";
 const app = express();
 
 app.use(cors({
-    origin: 'http://localhost:5173'
+    // origin: 'http://localhost:5173'
+    origin: 'https://koperasi-app-omega.vercel.app'
 }));
 
 app.use(express.json());
