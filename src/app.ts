@@ -9,6 +9,7 @@ import itemRouter from "./routers/itemRoutes";
 import kasirRouter from "./routers/kasirRoutes";
 import PembelianRouter from "./routers/pembellianRoutes";
 import laporanRouter from "./routers/laporanRoutes";
+import dashboardRouter from "./routers/dashboardRoutes";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use("/", itemRouter);
 app.use("/", kasirRouter);
 app.use("/", PembelianRouter);
 app.use("/", laporanRouter);
+app.use("/", dashboardRouter);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {

@@ -18,7 +18,7 @@ const generateIdTransaction = async () => {
     }
 
     const code = nextCode.toString().padStart(4, '0');
-    const date = moment().format('DD');
+    const date = moment().format('MM');
     const year = moment().format('YY');
 
     return `${code}/KSR/KOPSA/${date}/${year}`;
@@ -131,12 +131,22 @@ export const getKasirDetailController = async (req: Request, res: Response) => {
 
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT kasir_detail.id_transaksi, items.barcode, kasir_detail.kd_item, kasir_detail.nama_item, 
-                    kasir_detail.jenis, kasir_detail.jumlah, kasir_detail.satuan, kasir_detail.harga
-            FROM kasir_detail 
-            INNER JOIN items ON items.kode = kasir_detail.kd_item 
-            WHERE id_transaksi = ? 
-            ORDER BY nama_item`,
+            `SELECT 
+                kasir_detail.id_transaksi, items.barcode, kasir_detail.kd_item, kasir_detail.nama_item, 
+				kasir_detail.jenis, kasir_detail.jumlah, kasir_detail.satuan,
+                (
+                    SELECT harga_item.harga_jual
+                    FROM harga_item
+                    WHERE harga_item.kd_item = kasir_detail.kd_item
+                      AND harga_item.tanggal <= kasir.tanggal
+                    ORDER BY harga_item.tanggal DESC
+                    LIMIT 1
+                ) AS harga
+            FROM kasir_detail
+            JOIN kasir ON kasir.id_transaksi = kasir_detail.id_transaksi
+            INNER JOIN items ON items.kode = kasir_detail.kd_item
+            WHERE kasir.id_transaksi = ? 
+            ORDER BY kasir_detail.nama_item`,
             [idTransaksi]
         );   
         const kasirDetail = rows as KasirDetail[];

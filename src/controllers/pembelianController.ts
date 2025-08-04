@@ -18,7 +18,7 @@ const generateIdTransaction = async () => {
     }
 
     const code = nextCode.toString().padStart(4, '0');
-    const date = moment().format('DD');
+    const date = moment().format('MM');
     const year = moment().format('YY');
 
     return `${code}/BL/KOPSA/${date}/${year}`;
@@ -63,6 +63,18 @@ export const updatePembelianController = async (req: Request, res: Response) => 
 
     try {
         if(dataPembelian.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
+
+        const [oldDetails] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ?`,
+            [idTransaksi]
+        );
+
+        for (const detail of oldDetails) {
+            await connKopsas.query(
+                `UPDATE items SET stok = stok - ? WHERE kode = ?`,
+                [detail.jumlah, detail.kd_item]
+            );
+        }
 
         await connKopsas.query<RowDataPacket[]>(
             `UPDATE pembelian 

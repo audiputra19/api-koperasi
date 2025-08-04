@@ -30,7 +30,7 @@ export const inputSupplierController = async (req: Request, res: Response) => {
 
         const [rowsSupplier] = await connKopsas.query<RowDataPacket[]>(
             `SELECT * FROM supplier WHERE kode = ?`, 
-            [kode]
+            [kdSupp]
         );
 
         if(rowsSupplier.length > 0) {
