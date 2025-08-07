@@ -8,7 +8,7 @@ import moment from "moment";
 export const getPelangganController = async (req: Request, res: Response) => {
 
     try {
-        const [rows] = await connPayroll.query<RowDataPacket[]>(
+        const [rowsPayroll] = await connPayroll.query<RowDataPacket[]>(
             `SELECT dt_karyawan.ID_KAR as kode, 
                 dt_karyawan.NM_LKP as nama, 
                 pelanggan.id_kategori as idKategori, 
@@ -19,7 +19,12 @@ export const getPelangganController = async (req: Request, res: Response) => {
             WHERE dt_karyawan.OFF <> '1' 
             ORDER BY dt_karyawan.NM_LKP`
         );
-        const pelanggan = rows as Pelanggan[];
+
+        const [rowsUmum] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT kode, nama FROM pelanggan_umum`
+        );
+
+        const pelanggan = [...rowsPayroll, ...rowsUmum] as Pelanggan[];
         //console.log(pelanggan);
         res.status(200).json(pelanggan);
     } catch (error) {
@@ -65,7 +70,7 @@ export const searchPelangganController = async (req: Request, res: Response) => 
     if (!search) return res.json([]);
 
     try {
-        const [rows] = await connPayroll.query<RowDataPacket[]>(
+        const [rowsKaryawan] = await connPayroll.query<RowDataPacket[]>(
             `SELECT dt_karyawan.ID_KAR as kode, 
                 dt_karyawan.NM_LKP as nama, 
                 pelanggan.id_kategori as idKategori, 
@@ -75,8 +80,21 @@ export const searchPelangganController = async (req: Request, res: Response) => 
             WHERE dt_karyawan.OFF <> '1' AND (dt_karyawan.ID_KAR LIKE ? OR dt_karyawan.NM_LKP LIKE ?)
             ORDER BY dt_karyawan.NM_LKP`,
             [`%${search}%`, `%${search}%`]
-        )
-        const pelanggan = rows as Pelanggan[];
+        );
+
+        const [rowsUmum] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT kode, nama
+            FROM pelanggan_umum
+            WHERE kode LIKE ? OR nama LIKE ?
+            ORDER BY nama`,
+            [`%${search}%`, `%${search}%`]
+        );
+
+        // Gabungkan hasil tanpa membedakan
+        const pelanggan: Pelanggan[] = [
+            ...(rowsKaryawan as Pelanggan[]),
+            ...(rowsUmum as Pelanggan[])
+        ];
 
         res.status(200).json(pelanggan);
     } catch (error) {
