@@ -175,6 +175,18 @@ export const deletePembelianController = async (req: Request, res: Response) => 
     const { idTransaksi } = req.body;
 
     try {
+        const [oldDetails] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ?`,
+            [idTransaksi]
+        );
+
+        for (const detail of oldDetails) {
+            await connKopsas.query(
+                `UPDATE items SET stok = stok - ? WHERE kode = ?`,
+                [detail.jumlah, detail.kd_item]
+            );
+        }
+
         await connKopsas.query<RowDataPacket[]>(
             `DELETE FROM pembelian WHERE id_transaksi = ?`, [idTransaksi]
         );
