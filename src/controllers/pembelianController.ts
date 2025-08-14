@@ -191,6 +191,10 @@ export const deletePembelianController = async (req: Request, res: Response) => 
             `DELETE FROM pembelian WHERE id_transaksi = ?`, [idTransaksi]
         );
 
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM pembelian_detail WHERE id_transaksi = ?`, [idTransaksi]
+        );
+
         res.status(200).json({ message: 'Data berhasil dihapus' });
     } catch (error) {
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });  

@@ -27,7 +27,22 @@ const generateIdTransaction = async () => {
 export const inputKasirController = async (req: Request, res: Response) => {
     const { dataKasir, dataPelanggan, total, metode, startDate, userBuat } = req.body;
 
-    try { 
+    try {
+        const [rowJumlahBelanja] = await connKopsas.query(
+            `SELECT SUM(kasir.total) AS total, pelanggan.limit_belanja AS limitBelanja 
+            FROM kasir
+            INNER JOIN pelanggan ON pelanggan.kode = kasir.kd_pelanggan
+            WHERE kasir.kd_pelanggan = ?`,
+            [dataPelanggan.kodePelanggan]
+        );
+        const jmlBelanja = (rowJumlahBelanja as { total: number, limitBelanja: number }[])[0];
+        const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
+        const limitBelanja = jmlBelanja.limitBelanja;
+
+        console.log(`total belanja: ${totalBelanja}`);
+        console.log(`limit belanja: ${limitBelanja}`);
+
+        if(totalBelanja >= limitBelanja) return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
         if(dataKasir.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
         
         const idTransaction = await generateIdTransaction();
@@ -174,6 +189,10 @@ export const deleteKasirController = async (req: Request, res: Response) => {
     try {
         await connKopsas.query<RowDataPacket[]>(
             `DELETE FROM kasir WHERE id_transaksi = ?`, [idTransaksi]
+        );
+
+        await connKopsas.query<RowDataPacket[]>(
+            `DELETE FROM kasir_detail WHERE id_transaksi = ?`, [idTransaksi]
         );
 
         res.status(200).json({ message: 'Data berhasil dihapus' });
