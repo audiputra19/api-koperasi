@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import connKopsas from "../config/db/kopsas";
 import { RowDataPacket } from "mysql2";
-import moment from "moment";
+import moment from "moment-timezone";
 
-const year = moment().year();
+const year = moment().tz("Asia/Jakarta").year();
 
 export const getTotalAnggotaController = async (req: Request, res: Response) => {
     try {

@@ -3,7 +3,7 @@ import connPayroll from "../config/db/payroll";
 import { RowDataPacket } from "mysql2";
 import { Pelanggan } from "../interfaces/pelanggan";
 import connKopsas from "../config/db/kopsas";
-import moment from "moment";
+import moment from "moment-timezone";
 
 export const getPelangganController = async (req: Request, res: Response) => {
 
@@ -34,7 +34,7 @@ export const getPelangganController = async (req: Request, res: Response) => {
 
 export const inputPelangganController = async (req: Request, res: Response) => {
     const {kode, idKategori, limitBelanja, kredit} = req.body;
-    const date = moment().format("YYYY-MM-DD HH:mm:ss");
+    const date = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 
     try {
         const [rowsPelanggan] = await connKopsas.query<RowDataPacket[]>(

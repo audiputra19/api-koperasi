@@ -2,12 +2,12 @@ import { RowDataPacket } from "mysql2";
 import connKopsas from "../config/db/kopsas";
 import { Kasir } from "../interfaces/kasir";
 import { Request, Response } from "express";
-import moment from "moment";
+import moment from "moment-timezone";
 
 export const getLaporanController = async (req: Request, res: Response) => {
     const {date1, date2, kdPelanggan} = req.body;
-    const tanggal1 = moment(date1).format("YYYY-MM-DD"); 
-    const tanggal2 = moment(date2).format("YYYY-MM-DD");
+    const tanggal1 = moment(date1).tz("Asia/Jakarta").format("YYYY-MM-DD"); 
+    const tanggal2 = moment(date2).tz("Asia/Jakarta").format("YYYY-MM-DD");
 
     try {
         let query = `

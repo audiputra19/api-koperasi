@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import connKopsas from "../config/db/kopsas";
 import { RowDataPacket } from "mysql2";
 import { Supplier } from "../interfaces/supplier";
-import moment from "moment";
+import moment from "moment-timezone";
 
 interface MaxCodeRow extends RowDataPacket {
     maxCode: number | null;
@@ -23,7 +23,7 @@ const generateSupplierCode = async () => {
 
 export const inputSupplierController = async (req: Request, res: Response) => {
     const {kdSupp, nama, alamat} = req.body;
-    const date = moment().format("YYYY-MM-DD HH:mm:ss");
+    const date = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 
     try {
         const kode = await generateSupplierCode();

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import connKopsas from "../config/db/kopsas";
 import { RowDataPacket } from "mysql2";
-import moment from "moment";
+import moment from "moment-timezone";
 import { Pembelian, PembelianDetail } from "../interfaces/pembelian";
 
 interface MaxCodeRow extends RowDataPacket {
@@ -18,8 +18,8 @@ const generateIdTransaction = async () => {
     }
 
     const code = nextCode.toString().padStart(4, '0');
-    const date = moment().format('MM');
-    const year = moment().format('YY');
+    const date = moment().tz("Asia/Jakarta").format('MM');
+    const year = moment().tz("Asia/Jakarta").format('YY');
 
     return `${code}/BL/KOPSA/${date}/${year}`;
 }
