@@ -30,7 +30,7 @@ export const inputItemController = async (req: Request, res: Response) => {
         //console.log(hargaBeli, hargaJual); return;
 
         if (
-            !barcode || !nama || !satuan || !rak || !jenis
+            !nama || !satuan || !jenis
         ) {
             return res.status(400).json({ message: 'Semua field wajib diisi!' });
         }
