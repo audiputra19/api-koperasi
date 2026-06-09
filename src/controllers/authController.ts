@@ -39,8 +39,20 @@ export const loginController = async (req: Request, res: Response) => {
             message: 'Login berhasil'  
         });
     } catch (error) {
-        res.status(400).json({ message: 'terjadi kesalahan pada server' })
+        res.status(400).json({ message: 'terjadi kesalahan pada server' });
     }
 }
 
 export const me = (req: CustomRequest, res: Response) => res.status(200).json({ user: req.user });
+
+export const userController = async (req: Request, res: Response) => {
+    try {
+        const [rows] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT * FROM users`
+        )
+
+        res.status(200).json(rows);
+    } catch (error) {
+        res.status(400).json({ message: 'terjadi kesalahan pada server' });
+    }
+}
