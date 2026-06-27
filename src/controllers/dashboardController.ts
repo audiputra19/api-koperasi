@@ -93,7 +93,7 @@ export const getPopulerItemController = async (req: Request, res: Response) => {
         //     [year]
         // );
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT kasir_detail.nama_item AS nama, SUM(kasir_detail.jumlah * kasir_detail.harga) AS total 
+            `SELECT kasir_detail.nama_item AS nama, SUM(kasir_detail.jumlah) AS total 
             FROM kasir_detail
             INNER JOIN kasir ON kasir.id_transaksi = kasir_detail.id_transaksi
             WHERE YEAR(kasir.tanggal) = ?
