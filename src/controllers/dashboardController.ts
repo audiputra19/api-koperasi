@@ -82,13 +82,23 @@ export const getExpiredItemController = async (req: Request, res: Response) => {
 
 export const getPopulerItemController = async (req: Request, res: Response) => {
     try {
+        // const [rows] = await connKopsas.query<RowDataPacket[]>(
+        //     `SELECT pembelian_detail.nama_item AS nama, SUM(pembelian_detail.jumlah) AS total 
+        //     FROM pembelian_detail
+        //     INNER JOIN pembelian ON pembelian.id_transaksi = pembelian_detail.id_transaksi
+        //     WHERE YEAR(pembelian.tanggal) = ?
+        //     GROUP BY pembelian_detail.kd_item 
+        //     ORDER BY pembelian_detail.jumlah DESC 
+        //     LIMIT 5`, 
+        //     [year]
+        // );
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT pembelian_detail.nama_item AS nama, SUM(pembelian_detail.jumlah) AS total 
-            FROM pembelian_detail
-            INNER JOIN pembelian ON pembelian.id_transaksi = pembelian_detail.id_transaksi
-            WHERE YEAR(pembelian.tanggal) = ?
-            GROUP BY pembelian_detail.kd_item 
-            ORDER BY pembelian_detail.jumlah DESC 
+            `SELECT kasir_detail.nama_item AS nama, SUM(kasir_detail.jumlah * kasir_detail.harga) AS total 
+            FROM kasir_detail
+            INNER JOIN kasir ON kasir.id_transaksi = kasir_detail.id_transaksi
+            WHERE YEAR(kasir.tanggal) = ?
+            GROUP BY kasir_detail.kd_item 
+            ORDER BY total DESC 
             LIMIT 5`, 
             [year]
         );
