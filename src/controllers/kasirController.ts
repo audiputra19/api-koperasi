@@ -37,12 +37,14 @@ export const inputKasirController = async (req: Request, res: Response) => {
         );
         const jmlBelanja = (rowJumlahBelanja as { total: number, limitBelanja: number }[])[0];
         const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
-        const limitBelanja = jmlBelanja.limitBelanja;
+        const limitBelanja = Number(jmlBelanja.limitBelanja ?? 0);
 
         // console.log(`total belanja: ${totalBelanja}`);
         // console.log(`limit belanja: ${limitBelanja}`);
-        if(totalBelanja > 0) {
-            if(totalBelanja >= limitBelanja) return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
+        if (limitBelanja > 0) {
+            if (totalBelanja > limitBelanja) {
+                return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
+            }
         }
         if(dataKasir.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
         
