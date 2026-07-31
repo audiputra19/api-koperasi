@@ -11,6 +11,7 @@ export interface Pembelian {
 
 export interface PembelianDetail {
     id_transaksi: string;
+    barcode: string;
     kd_item: string;
     nama_item: string;
     jenis: string;

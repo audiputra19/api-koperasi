@@ -13,8 +13,9 @@ export const loginController = async (req: Request, res: Response) => {
         if(idAdmin.length === 0 || password.length === 0) return res.status(400).json({ message: 'Form wajib diisi!' });
 
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * 
+            `SELECT id, password, role, NM_LKP AS nama 
             FROM users 
+            INNER JOIN payroll_new.dt_karyawan ON users.id = dt_karyawan.ID_KAR
             WHERE id = ?`,
             [idAdmin]
         );
@@ -26,10 +27,9 @@ export const loginController = async (req: Request, res: Response) => {
         if(!isPasswordValid) return res.status(401).json({ message: 'Id admin atau password salah' });
 
         const token = generateToken({ 
-            id: user.id, 
+            id: user.id,
             nama: user.nama,
-            hakAkses: user.hakAkses,
-            kategori: user.kategori 
+            role: user.role
         });
 
         res.status(200).json({ 
@@ -48,7 +48,9 @@ export const me = (req: CustomRequest, res: Response) => res.status(200).json({ 
 export const userController = async (req: Request, res: Response) => {
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * FROM users`
+            `SELECT id, password, role, NM_LKP AS nama 
+            FROM users 
+            INNER JOIN payroll_new.dt_karyawan ON users.id = dt_karyawan.ID_KAR`
         )
 
         res.status(200).json(rows);

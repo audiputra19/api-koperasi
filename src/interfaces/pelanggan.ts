@@ -4,4 +4,7 @@ export interface Pelanggan {
     idKategori: number;
     limitBelanja: number;
     kredit: number;
+    role: string;
+    hasPassword: string;
+    sumber: string;
 }

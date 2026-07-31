@@ -1,30 +1,62 @@
 import { Request, Response } from "express";
 import connPayroll from "../config/db/payroll";
-import { RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { Pelanggan } from "../interfaces/pelanggan";
 import connKopsas from "../config/db/kopsas";
 import moment from "moment-timezone";
+import bcrypt from "bcrypt";
 
 export const getPelangganController = async (req: Request, res: Response) => {
+    const { userId } = req.body;
 
     try {
-        const [rowsPayroll] = await connPayroll.query<RowDataPacket[]>(
-            `SELECT dt_karyawan.ID_KAR as kode, 
-                dt_karyawan.NM_LKP as nama, 
-                pelanggan.id_kategori as idKategori, 
-                pelanggan.limit_belanja as limitBelanja,
-                pelanggan.kredit
-            FROM payroll_new.dt_karyawan
-            LEFT JOIN kopsa.pelanggan ON pelanggan.kode = dt_karyawan.ID_KAR
-            WHERE dt_karyawan.OFF <> '1' 
-            ORDER BY dt_karyawan.NM_LKP`
-        );
+        let pelanggan: Pelanggan[];
 
-        const [rowsUmum] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT kode, nama FROM pelanggan_umum`
-        );
+        if (userId) {
+            // Anggota
+            const [rowsPayroll] = await connPayroll.query<RowDataPacket[]>(
+                `SELECT dt_karyawan.ID_KAR as kode, 
+                    dt_karyawan.NM_LKP as nama, 
+                    pelanggan.id_kategori as idKategori, 
+                    pelanggan.limit_belanja as limitBelanja,
+                    pelanggan.kredit,
+                    users.role,
+                    CASE WHEN users.password IS NOT NULL THEN true ELSE false END as hasPassword,
+                    'karyawan' as sumber
+                FROM payroll_new.dt_karyawan
+                LEFT JOIN kopsa.pelanggan ON pelanggan.kode = dt_karyawan.ID_KAR
+                LEFT JOIN kopsa.users ON users.id = dt_karyawan.ID_KAR
+                WHERE dt_karyawan.OFF <> '1'
+                AND dt_karyawan.ID_KAR = ?
+                ORDER BY dt_karyawan.NM_LKP`, [userId]
+            );
 
-        const pelanggan = [...rowsPayroll, ...rowsUmum] as Pelanggan[];
+            pelanggan = rowsPayroll as Pelanggan[];
+        } else {
+            // Admin/Kasir/Pengawas: semua karyawan + semua pelanggan umum
+            const [rowsPayroll] = await connPayroll.query<RowDataPacket[]>(
+                `SELECT dt_karyawan.ID_KAR as kode, 
+                    dt_karyawan.NM_LKP as nama, 
+                    pelanggan.id_kategori as idKategori, 
+                    pelanggan.limit_belanja as limitBelanja,
+                    pelanggan.kredit,
+                    users.role,
+                    CASE WHEN users.password IS NOT NULL THEN true ELSE false END as hasPassword,
+                    'karyawan' as sumber
+                FROM payroll_new.dt_karyawan
+                LEFT JOIN kopsa.pelanggan ON pelanggan.kode = dt_karyawan.ID_KAR
+                LEFT JOIN kopsa.users ON users.id = dt_karyawan.ID_KAR
+                WHERE dt_karyawan.OFF <> '1'
+                ORDER BY dt_karyawan.NM_LKP`
+            );
+
+            const [rowsUmum] = await connKopsas.query<RowDataPacket[]>(
+                `SELECT kode, nama, limit_belanja as limitBelanja, kredit, 'umum' as sumber FROM pelanggan_umum`
+            );
+
+            pelanggan = [...rowsPayroll, ...rowsUmum] as Pelanggan[];
+        }
+
         //console.log(pelanggan);
         res.status(200).json(pelanggan);
     } catch (error) {
@@ -33,33 +65,79 @@ export const getPelangganController = async (req: Request, res: Response) => {
 }
 
 export const inputPelangganController = async (req: Request, res: Response) => {
-    const {kode, idKategori, limitBelanja, kredit} = req.body;
+    const {kode, idKategori, limitBelanja, kredit, role, password} = req.body;
     const date = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 
     try {
+        let hashedPassword = "";
+        if (password) {
+            const saltRounds = 10;
+            hashedPassword = await bcrypt.hash(password, saltRounds);
+        }
+
         const [rowsPelanggan] = await connKopsas.query<RowDataPacket[]>(
             `SELECT * FROM pelanggan WHERE kode = ?`, 
             [kode]
         );
 
-        if(rowsPelanggan.length > 0) {
-            await connKopsas.query<RowDataPacket[]>(
-                `UPDATE pelanggan 
-                SET id_kategori = ?, limit_belanja = ?, kredit = ?
-                WHERE kode = ?`,
-                [idKategori, limitBelanja, kredit, kode]
-            );
-        } else {
-            await connKopsas.query<RowDataPacket[]>(
-                `INSERT INTO pelanggan (kode, id_kategori, limit_belanja, kredit, tanggal) 
-                VALUES (?, ?, ?, ?, ?)`,
-                [kode, idKategori, limitBelanja, kredit, date]
-            );
+        const hasPelangganData = idKategori !== undefined && limitBelanja !== undefined && kredit !== undefined
+
+        if (hasPelangganData) {
+            if (rowsPelanggan.length > 0) {
+                await connKopsas.query<ResultSetHeader>(
+                    `UPDATE pelanggan 
+                    SET id_kategori = ?, limit_belanja = ?, kredit = ?
+                    WHERE kode = ?`,
+                    [idKategori, limitBelanja, kredit, kode]
+                );
+            } else {
+                await connKopsas.query<ResultSetHeader>(
+                    `INSERT INTO pelanggan (kode, id_kategori, limit_belanja, kredit, tanggal) 
+                    VALUES (?, ?, ?, ?, ?)`,
+                    [kode, idKategori, limitBelanja, kredit, date]
+                );
+            }
         }
 
-        res.status(200).json({ message: "Pelanggan berhasil ditambahkan" });
-    } catch (error) {
-        console.error("DB Error:", error);
+        const [rowsUsers] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT * FROM users WHERE id = ?`, 
+            [kode]
+        );
+
+        if (rowsUsers.length > 0) {
+            if (password && role !== undefined) {
+                await connKopsas.query<ResultSetHeader>(
+                    `UPDATE users SET password = ?, role = ? WHERE id = ?`,
+                    [hashedPassword, role, kode]
+                );
+            } else if (password) {
+                await connKopsas.query<ResultSetHeader>(
+                    `UPDATE users SET password = ? WHERE id = ?`,
+                    [hashedPassword, kode]
+                );
+            } else if (role !== undefined) {
+                await connKopsas.query<ResultSetHeader>(
+                    `UPDATE users SET role = ? WHERE id = ?`,
+                    [role, kode]
+                );
+            }
+        } else {
+            if (password) {
+                await connKopsas.query<ResultSetHeader>(
+                    `INSERT INTO users (id, password, role) VALUES (?, ?, ?)`,
+                    [kode, hashedPassword, role ?? ""]
+                );
+            } else if (role !== undefined) {
+                await connKopsas.query<ResultSetHeader>(
+                    `INSERT INTO users (id, role) VALUES (?, ?)`,
+                    [kode, role]
+                );
+            }
+        }
+
+        res.status(200).json({ message: "Pelanggan berhasil diupdate" });
+    } catch (error: any) {
+        console.error("DB Error:", error.code, error.sqlMessage);
         res.status(400).json({ message: "Terjadi kesalahan pada server" })
     }
 }

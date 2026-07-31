@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import express from "express";
+import express, { Request, Response } from "express";
 import authRouter from "./routers/authRoutes";
 import cors from "cors";
 import supplierRouter from "./routers/supplierRoutes";
@@ -15,8 +15,8 @@ import hakAksesRouter from "./routers/hakAksesRoutes";
 const app = express();
 
 app.use(cors({
-    // origin: 'http://localhost:5173'
-    origin: 'https://koperasi-app-omega.vercel.app'
+    origin: 'http://localhost:3000'
+    // origin: 'https://koperasi-app-omega.vercel.app'
 }));
 
 app.use(express.json());
@@ -29,6 +29,10 @@ app.use("/", PembelianRouter);
 app.use("/", laporanRouter);
 app.use("/", dashboardRouter);
 app.use("/", hakAksesRouter);
+
+app.get("/", (req: Request, res: Response) => {
+    res.send("welcome");
+});
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {

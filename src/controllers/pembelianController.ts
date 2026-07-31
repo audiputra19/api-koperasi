@@ -155,6 +155,7 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
         
         const dataPembelianDetail = PembelianDetail.map(item => {
             return {
+                barcode: item.barcode,
                 kodeItem: item.kd_item,
                 namaItem: item.nama_item,
                 jenis: item.jenis,
@@ -174,30 +175,58 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
 export const deletePembelianController = async (req: Request, res: Response) => {
     const { idTransaksi } = req.body;
 
+    const connection = await connKopsas.getConnection();
+
     try {
-        const [oldDetails] = await connKopsas.query<RowDataPacket[]>(
+        await connection.beginTransaction();
+
+        const [oldDetails] = await connection.query<RowDataPacket[]>(
             `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ?`,
             [idTransaksi]
         );
 
         for (const detail of oldDetails) {
-            await connKopsas.query(
+            const [items] = await connection.query<RowDataPacket[]>(
+                `SELECT nama, stok FROM items WHERE kode = ?`,
+                [detail.kd_item]
+            );
+
+            const currentItem = items[0];
+
+            // Cek jika barang ada dan apakah stok mencukupi
+            if (!currentItem || (currentItem.stok - detail.jumlah < 0)) {
+                await connection.rollback();
+                return res.status(200).json({ 
+                    message: `Transaksi tidak dapat dihapus! Stok "${currentItem?.nama || detail.kd_item}" tidak mencukupi.` 
+                });
+            }
+        }
+
+        for (const detail of oldDetails) {
+            await connection.query(
                 `UPDATE items SET stok = stok - ? WHERE kode = ?`,
                 [detail.jumlah, detail.kd_item]
             );
         }
 
-        await connKopsas.query<RowDataPacket[]>(
-            `DELETE FROM pembelian WHERE id_transaksi = ?`, [idTransaksi]
-        );
-
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query(
             `DELETE FROM pembelian_detail WHERE id_transaksi = ?`, [idTransaksi]
         );
 
-        res.status(200).json({ message: 'Data berhasil dihapus' });
+        await connection.query(
+            `DELETE FROM pembelian WHERE id_transaksi = ?`, [idTransaksi]
+        );
+
+        await connection.commit();
+        return res.status(200).json({ message: 'Data berhasil dihapus' });
+
     } catch (error) {
-        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+        await connection.rollback();
+        console.error("Error pada deletePembelianController:", error);
+        return res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+    } finally {
+        // PENTING: Wajib dilepas agar connection pool tidak habis!
+        connection.release();
     }
 }
 
@@ -219,5 +248,50 @@ export const deletePembelianDetailController = async (req: Request, res: Respons
         res.status(200).json({ message: 'Data berhasil dihapus' });
     } catch (error) {
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    }
+}
+
+export const inputHargaItem = async (req: Request, res: Response) => {
+    const { kdItem, hargaBeli, hargaJual } = req.body;
+    const date = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
+
+    try {
+        if (!kdItem) return res.status(400).json({ message: "Kode item tidak terdeteksi" });
+
+        if (
+            !hargaBeli || !hargaJual
+        ) {
+            return res.status(400).json({ message: 'Semua field wajib diisi!' });
+        }
+
+        await connKopsas.query<RowDataPacket[]>(
+            `INSERT INTO harga_item 
+            (kd_item, tanggal, harga_beli, harga_jual)
+            VALUES (?, ?, ?, ?)`, 
+            [kdItem, date, hargaBeli, hargaJual]
+        ) 
+
+        res.status(200).json({ message: 'Harga berhasil diupdate' });
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' }); 
+    }
+}
+
+export const getHargaItem = async (req: Request, res: Response) => {
+    const { kdItem } = req.body;
+
+    try {
+        const [rows] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT hi.kd_item AS kdItem, hi.tanggal, hi.harga_beli AS hargaBeli,
+                hi.harga_jual AS hargaJual
+            FROM harga_item hi
+            WHERE hi.kd_item = ? 
+            ORDER BY hi.tanggal DESC`,
+            [kdItem]
+        );  
+
+        res.status(200).json(rows);
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' }); 
     }
 }

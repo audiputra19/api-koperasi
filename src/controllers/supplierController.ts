@@ -48,7 +48,7 @@ export const inputSupplierController = async (req: Request, res: Response) => {
             )
         }
 
-        res.status(200).json({ message: 'supplier berhasil ditambahkan' });
+        res.status(200).json({ message: 'supplier berhasil diupdate' });
     } catch (error) {
         res.status(400).json({ message: 'terjadi kesalahan pada server' });
     }

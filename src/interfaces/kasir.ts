@@ -17,4 +17,5 @@ export interface KasirDetail {
     jumlah: number;
     satuan: string;
     harga: number;
+    harga_beli: number;
 }

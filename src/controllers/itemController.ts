@@ -36,7 +36,7 @@ export const inputItemController = async (req: Request, res: Response) => {
         }
 
         if (
-            isNaN(stokMinimal) || stokMinimal <= 0 ||
+            isNaN(stokMinimal) ||
             isNaN(status) || status === 0
         ) {
             return res.status(400).json({ message: 'Semua field wajib diisi!' });
@@ -52,9 +52,9 @@ export const inputItemController = async (req: Request, res: Response) => {
         if(rowsItem.length > 0) {
             await connKopsas.query<RowDataPacket[]>(
                 `UPDATE items 
-                SET barcode = ?, nama = ?, satuan = ?, rak = ?, jenis = ?, stok_minimal = ?, status = ?
+                SET barcode = ?, nama = ?, stok = ?, satuan = ?, rak = ?, jenis = ?, stok_minimal = ?, status = ?
                 WHERE kode = ?`,
-                [barcode, nama, satuan, rak, jenis, stokMinimal, status, kdItem]
+                [barcode, nama, stok, satuan, rak, jenis, stokMinimal, status, kdItem]
             )
 
             if(hargaBeli > 0 && hargaJual > 0) {
@@ -86,7 +86,7 @@ export const inputItemController = async (req: Request, res: Response) => {
             }
         }
 
-        res.status(200).json({ message: 'item berhasil ditambahkan' });
+        res.status(200).json({ message: 'item berhasil diupdate' });
     } catch (error) {
         console.error("ERROR:", error);
         res.status(400).json({ message: 'terjadi kesalahan pada server' });

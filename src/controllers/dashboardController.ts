@@ -49,8 +49,10 @@ export const getLimitItemController = async (req: Request, res: Response) => {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
             `SELECT 
                 kode,
+                barcode,
                 nama,
                 stok AS jumlah,
+                stok_minimal,
                 rak
             FROM 
                 items
@@ -68,10 +70,11 @@ export const getLimitItemController = async (req: Request, res: Response) => {
 export const getExpiredItemController = async (req: Request, res: Response) => {
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT pembelian_detail.kd_item AS kode, pembelian_detail.nama_item AS nama, pembelian_detail.jumlah, items.rak, pembelian_detail.expired_date AS expiredDate
+            `SELECT pembelian_detail.kd_item AS kode, items.barcode, pembelian_detail.nama_item AS nama, pembelian_detail.jumlah, items.rak, pembelian_detail.expired_date AS expiredDate
             FROM pembelian_detail
             INNER JOIN items ON items.kode = pembelian_detail.kd_item
-            WHERE DATE(expired_date) BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY`
+            WHERE DATE(expired_date) <= CURDATE() + INTERVAL 7 DAY
+            AND expired_date <> ''`
         );
 
         res.status(200).json(rows);
