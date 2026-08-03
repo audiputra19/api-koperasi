@@ -7,6 +7,7 @@ export interface Kasir {
     user_buat: string;
     user_ubah: string;
     metode: number;
+    sumber: string;
 }
 
 export interface KasirDetail {

@@ -37,38 +37,40 @@ export const inputKasirController = async (req: Request, res: Response) => {
             return res.status(200).json({ message: "Item belum dipilih" });
         }
 
-        const [rowPelanggan] = await connKopsas.query(
-            `SELECT pelanggan.limit_belanja AS limitBelanja, pelanggan.kredit
-            FROM pelanggan
-            WHERE pelanggan.kode = ?`,
-            [dataPelanggan.kodePelanggan]
-        );
-
-        const startOfMonth = moment().tz("Asia/Jakarta").startOf("month").format("YYYY-MM-DD HH:mm:ss");
-        const endOfMonth = moment().tz("Asia/Jakarta").endOf("month").format("YYYY-MM-DD HH:mm:ss");
-
-        const [rowJumlahBelanjaBulanan] = await connKopsas.query(
-            `SELECT SUM(kasir.total) AS total
-            FROM kasir
-            WHERE kasir.kd_pelanggan = ?
-            AND kasir.tanggal BETWEEN ? AND ?`,
-            [dataPelanggan.kodePelanggan, startOfMonth, endOfMonth]
-        );
-        const jmlBelanja = (rowJumlahBelanjaBulanan as { total: number }[])[0];
-        const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
-        
-        const pelanggan = (rowPelanggan as { limitBelanja: number, kredit: number }[])[0]
-        const limitBelanja = Number(pelanggan.limitBelanja ?? 0);
-        const kredit = Number(pelanggan.kredit ?? 0);
-
-        if (kredit === 0) {
-            await connection.rollback();
-            return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
-        }
-
-        if (limitBelanja > 0 && totalBelanja > limitBelanja) {
-            await connection.rollback();
-            return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
+        if (dataPelanggan?.sumberPelanggan !== 'umum') {
+            const [rowPelanggan] = await connKopsas.query(
+                `SELECT pelanggan.limit_belanja AS limitBelanja, pelanggan.kredit
+                FROM pelanggan
+                WHERE pelanggan.kode = ?`,
+                [dataPelanggan.kodePelanggan]
+            );
+    
+            const startOfMonth = moment().tz("Asia/Jakarta").startOf("month").format("YYYY-MM-DD HH:mm:ss");
+            const endOfMonth = moment().tz("Asia/Jakarta").endOf("month").format("YYYY-MM-DD HH:mm:ss");
+    
+            const [rowJumlahBelanjaBulanan] = await connKopsas.query(
+                `SELECT SUM(kasir.total) AS total
+                FROM kasir
+                WHERE kasir.kd_pelanggan = ?
+                AND kasir.tanggal BETWEEN ? AND ?`,
+                [dataPelanggan.kodePelanggan, startOfMonth, endOfMonth]
+            );
+            const jmlBelanja = (rowJumlahBelanjaBulanan as { total: number }[])[0];
+            const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
+            
+            const pelanggan = (rowPelanggan as { limitBelanja: number, kredit: number }[])[0]
+            const limitBelanja = Number(pelanggan.limitBelanja ?? 0);
+            const kredit = Number(pelanggan.kredit ?? 0);
+    
+            if (kredit === 0) {
+                await connection.rollback();
+                return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
+            }
+    
+            if (limitBelanja > 0 && totalBelanja > limitBelanja) {
+                await connection.rollback();
+                return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
+            }
         }
 
         for (const item of dataKasir) {
@@ -207,7 +209,8 @@ export const getKasirController = async (req: Request, res: Response) => {
                 total: item.total,
                 userBuat: item.user_buat,
                 userUbah: item.user_ubah,
-                metode: item.metode
+                metode: item.metode,
+                sumber: item.sumber,
             }
         });
 
