@@ -23,14 +23,22 @@ const generateIdTransaction = async () => {
 
     return `${code}/BL/KOPSA/${date}/${year}`;
 }
+
 export const inputPembelianController = async (req: Request, res: Response) => {
     const { dataPembelian, dataSupplier, total, metode, startDate, userBuat } = req.body;
 
+    const connection = await connKopsas.getConnection();
+
     try {
-        if(dataPembelian.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
+        await connection.beginTransaction();
+
+        if(dataPembelian.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Item belum dipilih" });
+        }
 
         const idTransaction = await generateIdTransaction();
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `INSERT INTO pembelian 
             (id_transaksi, tanggal, kd_supplier, nama_supplier, total, user_buat, metode)
             VALUES (?, ?, ?, ?, ?, ?, ?)`, 
@@ -38,45 +46,56 @@ export const inputPembelianController = async (req: Request, res: Response) => {
         )
 
         for (const item of dataPembelian) {
-            await connKopsas.query<RowDataPacket[]>(
+            await connection.query<RowDataPacket[]>(
                 `INSERT INTO pembelian_detail
                 (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [idTransaction, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
             )
 
-            await connKopsas.query<RowDataPacket[]>(
+            await connection.query<RowDataPacket[]>(
                 `UPDATE items SET stok = stok + ? WHERE kode = ?`,
                 [item.jumlah, item.kodeItem]
             )
         }
 
+        await connection.commit();
         res.status(200).json({ message: 'Transaksi berhasil disimpan' });
     } catch (error) {
+        await connection.rollback();
         console.error(error);
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });
+    } finally {
+        connection.release();
     }
 }
 
 export const updatePembelianController = async (req: Request, res: Response) => {
     const { idTransaksi, dataPembelian, dataSupplier, total, metode, startDate, userBuat } = req.body;
 
-    try {
-        if(dataPembelian.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
+    const connection = await connKopsas.getConnection();
 
-        const [oldDetails] = await connKopsas.query<RowDataPacket[]>(
+    try {
+        await connection.beginTransaction();
+
+        if(dataPembelian.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Item belum dipilih" });
+        }
+
+        const [oldDetails] = await connection.query<RowDataPacket[]>(
             `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ?`,
             [idTransaksi]
         );
 
         for (const detail of oldDetails) {
-            await connKopsas.query(
+            await connection.query(
                 `UPDATE items SET stok = stok - ? WHERE kode = ?`,
                 [detail.jumlah, detail.kd_item]
             );
         }
 
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `UPDATE pembelian 
             SET tanggal = ?, kd_supplier = ?, nama_supplier = ?, total = ?, user_ubah = ?, metode = ? 
             WHERE id_transaksi = ?`, 
@@ -84,29 +103,33 @@ export const updatePembelianController = async (req: Request, res: Response) => 
             metode, idTransaksi]
         )
 
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `DELETE FROM pembelian_detail WHERE id_transaksi = ?`,
             [idTransaksi]
         )
 
         for (const item of dataPembelian) {
-            await connKopsas.query<RowDataPacket[]>(
+            await connection.query<RowDataPacket[]>(
                 `INSERT INTO pembelian_detail
                 (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [idTransaksi, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
             )
 
-            await connKopsas.query<RowDataPacket[]>(
+            await connection.query<RowDataPacket[]>(
                 `UPDATE items SET stok = stok + ? WHERE kode = ?`,
                 [item.jumlah, item.kodeItem]
             )
         }
 
+        await connection.commit();
         res.status(200).json({ message: 'Transaksi berhasil disimpan' });
     } catch (error) {
+        await connection.rollback();
         console.error(error);
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });
+    } finally {
+        connection.release();
     }
 }
 
@@ -233,21 +256,29 @@ export const deletePembelianController = async (req: Request, res: Response) => 
 export const deletePembelianDetailController = async (req: Request, res: Response) => {
     const { idTransaksi, kdItem, total } = req.body;
 
+    const connection = await connKopsas.getConnection();
+
     try {
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.beginTransaction();
+
+        await connection.query<RowDataPacket[]>(
             `UPDATE pembelian 
             SET total = total - ? 
             WHERE id_transaksi = ?`, 
             [total, idTransaksi]
         );
 
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `DELETE FROM pembelian_detail WHERE id_transaksi = ? AND kd_item = ?`, [idTransaksi, kdItem]
         );
 
+        await connection.commit();
         res.status(200).json({ message: 'Data berhasil dihapus' });
     } catch (error) {
+        await connection.rollback();
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    } finally {
+        connection.release();
     }
 }
 

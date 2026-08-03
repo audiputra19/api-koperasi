@@ -61,8 +61,6 @@ export const inputKasirController = async (req: Request, res: Response) => {
         const limitBelanja = Number(pelanggan.limitBelanja ?? 0);
         const kredit = Number(pelanggan.kredit ?? 0);
 
-        // console.log(`total belanja: ${totalBelanja}`);
-        // console.log(`limit belanja: ${limitBelanja}`);
         if (kredit === 0) {
             await connection.rollback();
             return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
@@ -132,40 +130,63 @@ export const inputKasirController = async (req: Request, res: Response) => {
 export const updateKasirController = async (req: Request, res: Response) => {
     const { idTransaksi, dataKasir, dataPelanggan, total, metode, startDate, userBuat } = req.body;
 
-    try {
-        if(dataKasir.length === 0) return res.status(400).json({ message: "Item belum dipilih" });
+    const connection = await connKopsas.getConnection();
 
-        await connKopsas.query<RowDataPacket[]>(
+    try {
+        await connection.beginTransaction();
+
+        if(dataKasir.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Item belum dipilih" });
+        }
+
+        const [oldDetails] = await connection.query<RowDataPacket[]>(
+            `SELECT kd_item, jumlah FROM kasir_detail WHERE id_transaksi = ?`,
+            [idTransaksi]
+        );
+
+        await connection.query<RowDataPacket[]>(
             `UPDATE kasir 
             SET tanggal = ?, kd_pelanggan = ?, nama_pelanggan = ?, total = ?, user_ubah = ?, metode = ? 
             WHERE id_transaksi = ?`, 
             [startDate, dataPelanggan.kodePelanggan, dataPelanggan.namaPelanggan, total, userBuat, 
             metode, idTransaksi]
-        )
+        );
 
-        await connKopsas.query<RowDataPacket[]>(
+        for (const oldItem of oldDetails) {
+            await connection.query<RowDataPacket[]>(
+                `UPDATE items SET stok = stok + ? WHERE kode = ?`,
+                [oldItem.jumlah, oldItem.kd_item]
+            );
+        }
+
+        await connection.query<RowDataPacket[]>(
             `DELETE FROM kasir_detail WHERE id_transaksi = ?`,
             [idTransaksi]
         );
 
         for (const item of dataKasir) {
-            await connKopsas.query<RowDataPacket[]>(
+            await connection.query<RowDataPacket[]>(
                 `INSERT INTO kasir_detail
                 (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga)
                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [idTransaksi, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga]
             )
 
-            await connKopsas.query<RowDataPacket[]>(
+            await connection.query<RowDataPacket[]>(
                 `UPDATE items SET stok = stok - ? WHERE kode = ?`,
                 [item.jumlah, item.kodeItem]
             )
         }
 
+        await connection.commit();
         res.status(200).json({ message: 'Transaksi berhasil disimpan' });
     } catch (error) {
+        await connection.rollback();
         console.error(error);
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });
+    } finally {
+        connection.release();
     }
 }
 
@@ -251,50 +272,66 @@ export const getKasirDetailController = async (req: Request, res: Response) => {
 export const deleteKasirController = async (req: Request, res: Response) => {
     const { idTransaksi } = req.body;
 
+    const connection = await connKopsas.getConnection();
+
     try {
-        const [oldDetails] = await connKopsas.query<RowDataPacket[]>(
+        await connection.beginTransaction();
+
+        const [oldDetails] = await connection.query<RowDataPacket[]>(
             `SELECT kd_item, jumlah FROM kasir_detail WHERE id_transaksi = ?`,
             [idTransaksi]
         );
 
         for (const detail of oldDetails) {
-            await connKopsas.query(
+            await connection.query(
                 `UPDATE items SET stok = stok + ? WHERE kode = ?`,
                 [detail.jumlah, detail.kd_item]
             );
         }
 
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `DELETE FROM kasir WHERE id_transaksi = ?`, [idTransaksi]
         );
 
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `DELETE FROM kasir_detail WHERE id_transaksi = ?`, [idTransaksi]
         );
 
+        await connection.commit();
         res.status(200).json({ message: 'Data berhasil dihapus' });
     } catch (error) {
+        await connection.rollback();
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    } finally {
+        connection.release();
     }
 }
 
 export const deleteKasirDetailController = async (req: Request, res: Response) => {
     const { idTransaksi, kdItem, total } = req.body;
 
+    const connection = await connKopsas.getConnection();
+
     try {
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.beginTransaction();
+
+        await connection.query<RowDataPacket[]>(
             `UPDATE kasir 
             SET total = total - ? 
             WHERE id_transaksi = ?`, 
             [total, idTransaksi]
         );
 
-        await connKopsas.query<RowDataPacket[]>(
+        await connection.query<RowDataPacket[]>(
             `DELETE FROM kasir_detail WHERE id_transaksi = ? AND kd_item = ?`, [idTransaksi, kdItem]
         );
 
+        await connection.commit();
         res.status(200).json({ message: 'Data berhasil dihapus' });
     } catch (error) {
+        await connection.rollback();
         res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    } finally {
+        connection.release();
     }
 }
