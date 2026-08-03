@@ -37,6 +37,13 @@ export const inputKasirController = async (req: Request, res: Response) => {
             return res.status(200).json({ message: "Item belum dipilih" });
         }
 
+        if (dataPelanggan?.sumberPelanggan === 'umum') {
+            if(metode === 2) {
+                await connection.rollback();
+                return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
+            }
+        }
+
         if (dataPelanggan?.sumberPelanggan !== 'umum') {
             const [rowPelanggan] = await connKopsas.query(
                 `SELECT pelanggan.limit_belanja AS limitBelanja, pelanggan.kredit
