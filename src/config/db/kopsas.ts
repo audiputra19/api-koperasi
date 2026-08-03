@@ -4,7 +4,8 @@ const connKopsas = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
-    database: process.env.DB_NAME_KOPSAS
+    database: process.env.DB_NAME_KOPSAS,
+    timezone: '+07:00'
 });
 
 connKopsas.getConnection()
