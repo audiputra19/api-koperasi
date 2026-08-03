@@ -57,6 +57,7 @@ export const getLaporanPembelianController = async (req: Request, res: Response)
             SELECT * 
             FROM pembelian 
             WHERE DATE(tanggal) BETWEEN ? AND ?
+            AND metode = '1'
         `;
         const params: any[] = [tanggal1, tanggal2];
 
