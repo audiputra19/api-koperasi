@@ -25,71 +25,72 @@ export const inputItemController = async (req: Request, res: Response) => {
     const { kdItem, barcode, nama, stok, satuan, rak, jenis, hargaBeli, hargaJual, stokMinimal, status } = req.body;
     const date = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 
+    if (!nama || !satuan || !jenis) {
+        return res.status(400).json({ message: 'Semua field wajib diisi!' });
+    }
+
+    if (isNaN(stokMinimal) || isNaN(status) || status === 0) {
+        return res.status(400).json({ message: 'Semua field wajib diisi!' });
+    }
+
+    const conn = await connKopsas.getConnection();
+
     try {
-
-        //console.log(hargaBeli, hargaJual); return;
-
-        if (
-            !nama || !satuan || !jenis
-        ) {
-            return res.status(400).json({ message: 'Semua field wajib diisi!' });
-        }
-
-        if (
-            isNaN(stokMinimal) ||
-            isNaN(status) || status === 0
-        ) {
-            return res.status(400).json({ message: 'Semua field wajib diisi!' });
-        }
+        await conn.beginTransaction();
 
         const kode = await generateItemCode();
 
-        const [rowsItem] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * FROM items WHERE kode = ?`, 
+        const [rowsItem] = await conn.query<RowDataPacket[]>(
+            `SELECT * FROM items WHERE kode = ?`,
             [kdItem]
         );
 
-        if(rowsItem.length > 0) {
-            await connKopsas.query<RowDataPacket[]>(
+        if (rowsItem.length > 0) {
+            await conn.query(
                 `UPDATE items 
                 SET barcode = ?, nama = ?, stok = ?, satuan = ?, rak = ?, jenis = ?, stok_minimal = ?, status = ?
                 WHERE kode = ?`,
                 [barcode, nama, stok, satuan, rak, jenis, stokMinimal, status, kdItem]
-            )
+            );
 
-            if(hargaBeli > 0 && hargaJual > 0) {
-                await connKopsas.query<RowDataPacket[]>(
+            if (hargaBeli > 0 && hargaJual > 0) {
+                await conn.query(
                     `INSERT INTO harga_item (kd_item, tanggal, harga_beli, harga_jual)
                     VALUES (?, ?, ?, ?)`,
                     [kdItem, date, hargaBeli, hargaJual]
-                )
+                );
             }
         } else {
-            if(isNaN(stok) || stok < 0 ||
-            isNaN(hargaBeli) || hargaBeli <= 0 ||
-            isNaN(hargaJual) || hargaJual <= 0){
+            if (isNaN(stok) || stok < 0 ||
+                isNaN(hargaBeli) || hargaBeli <= 0 ||
+                isNaN(hargaJual) || hargaJual <= 0) {
+                await conn.rollback();
                 return res.status(400).json({ message: 'Semua field wajib diisi!' });
             }
 
-            await connKopsas.query<RowDataPacket[]>(
+            await conn.query(
                 `INSERT INTO items (kode, barcode, nama, stok, satuan, rak, jenis, stok_minimal, status) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [kode, barcode, nama, stok, satuan, rak, jenis, stokMinimal, status]
-            )
+            );
 
-            if(hargaBeli > 0 && hargaJual > 0) {
-                await connKopsas.query<RowDataPacket[]>(
+            if (hargaBeli > 0 && hargaJual > 0) {
+                await conn.query(
                     `INSERT INTO harga_item (kd_item, tanggal, harga_beli, harga_jual)
                     VALUES (?, ?, ?, ?)`,
                     [kode, date, hargaBeli, hargaJual]
-                )
+                );
             }
         }
 
+        await conn.commit();
         res.status(200).json({ message: 'item berhasil diupdate' });
     } catch (error) {
+        await conn.rollback();
         console.error("ERROR:", error);
         res.status(400).json({ message: 'terjadi kesalahan pada server' });
+    } finally {
+        conn.release();
     }
 }
 

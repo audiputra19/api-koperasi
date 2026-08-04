@@ -68,6 +68,8 @@ export const inputPelangganController = async (req: Request, res: Response) => {
     const {kode, idKategori, limitBelanja, kredit, role, password} = req.body;
     const date = moment().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 
+    const connection = await connKopsas.getConnection();
+
     try {
         let hashedPassword = "";
         if (password) {
@@ -75,7 +77,9 @@ export const inputPelangganController = async (req: Request, res: Response) => {
             hashedPassword = await bcrypt.hash(password, saltRounds);
         }
 
-        const [rowsPelanggan] = await connKopsas.query<RowDataPacket[]>(
+        await connection.beginTransaction();
+
+        const [rowsPelanggan] = await connection.query<RowDataPacket[]>(
             `SELECT * FROM pelanggan WHERE kode = ?`, 
             [kode]
         );
@@ -84,14 +88,14 @@ export const inputPelangganController = async (req: Request, res: Response) => {
 
         if (hasPelangganData) {
             if (rowsPelanggan.length > 0) {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `UPDATE pelanggan 
                     SET id_kategori = ?, limit_belanja = ?, kredit = ?
                     WHERE kode = ?`,
                     [idKategori, limitBelanja, kredit, kode]
                 );
             } else {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `INSERT INTO pelanggan (kode, id_kategori, limit_belanja, kredit, tanggal) 
                     VALUES (?, ?, ?, ?, ?)`,
                     [kode, idKategori, limitBelanja, kredit, date]
@@ -99,46 +103,50 @@ export const inputPelangganController = async (req: Request, res: Response) => {
             }
         }
 
-        const [rowsUsers] = await connKopsas.query<RowDataPacket[]>(
+        const [rowsUsers] = await connection.query<RowDataPacket[]>(
             `SELECT * FROM users WHERE id = ?`, 
             [kode]
         );
 
         if (rowsUsers.length > 0) {
             if (password && role !== undefined) {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `UPDATE users SET password = ?, role = ? WHERE id = ?`,
                     [hashedPassword, role, kode]
                 );
             } else if (password) {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `UPDATE users SET password = ? WHERE id = ?`,
                     [hashedPassword, kode]
                 );
             } else if (role !== undefined) {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `UPDATE users SET role = ? WHERE id = ?`,
                     [role, kode]
                 );
             }
         } else {
             if (password) {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `INSERT INTO users (id, password, role) VALUES (?, ?, ?)`,
                     [kode, hashedPassword, role ?? ""]
                 );
             } else if (role !== undefined) {
-                await connKopsas.query<ResultSetHeader>(
+                await connection.query<ResultSetHeader>(
                     `INSERT INTO users (id, role) VALUES (?, ?)`,
                     [kode, role]
                 );
             }
         }
 
+        await connection.commit();
         res.status(200).json({ message: "Pelanggan berhasil diupdate" });
     } catch (error: any) {
+        await connection.rollback();
         console.error("DB Error:", error.code, error.sqlMessage);
         res.status(400).json({ message: "Terjadi kesalahan pada server" })
+    } finally {
+        connection.release();
     }
 }
 
