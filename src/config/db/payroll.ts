@@ -13,15 +13,15 @@ const connPayroll =
     database: process.env.DB_NAME_PAYROLL,
     timezone: '+07:00',
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 2,
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
-  })
+    idleTimeout: 60000,
+    maxIdle: 1,
+})
 
-if (process.env.NODE_ENV !== 'production') {
-  global.__connPayroll = connPayroll
-}
+global.__connPayroll = connPayroll
 
 connPayroll.on('connection', () => {
   console.log('Database Payroll: koneksi baru dibuat')
