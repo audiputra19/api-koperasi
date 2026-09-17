@@ -15,7 +15,7 @@ import hakAksesRouter from "./routers/hakAksesRoutes";
 const app = express();
 
 app.use(cors({
-    origin: 'https://koperasi-next-app.vercel.app'
+     origin: 'https://koperasi-next-app.vercel.app'
     // origin: 'http://localhost:3000'
     // origin: 'https://koperasi-app-omega.vercel.app'
 }));
