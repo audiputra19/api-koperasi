@@ -37,47 +37,40 @@ export const inputKasirController = async (req: Request, res: Response) => {
             return res.status(200).json({ message: "Item belum dipilih" });
         }
 
-        if (dataPelanggan?.sumberPelanggan === 'umum') {
-            if(metode === 2) {
-                await connection.rollback();
-                return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
-            }
+        const tabelPelanggan = dataPelanggan?.sumberPelanggan === 'umum' ? 'pelanggan_umum' : 'pelanggan';
+
+        const [rowPelanggan] = await connKopsas.query(
+            `SELECT limit_belanja AS limitBelanja, kredit
+            FROM ${tabelPelanggan}
+            WHERE kode = ?`,
+            [dataPelanggan.kodePelanggan]
+        );
+
+        const pelanggan = (rowPelanggan as { limitBelanja: number, kredit: number }[])[0];
+        const limitBelanja = Number(pelanggan?.limitBelanja ?? 0);
+        const kredit = Number(pelanggan?.kredit ?? 0);
+
+        if (metode === 2 && kredit === 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
         }
 
-        if (dataPelanggan?.sumberPelanggan !== 'umum') {
-            const [rowPelanggan] = await connKopsas.query(
-                `SELECT pelanggan.limit_belanja AS limitBelanja, pelanggan.kredit
-                FROM pelanggan
-                WHERE pelanggan.kode = ?`,
-                [dataPelanggan.kodePelanggan]
-            );
-    
-            const startOfMonth = moment().tz("Asia/Jakarta").startOf("month").format("YYYY-MM-DD HH:mm:ss");
-            const endOfMonth = moment().tz("Asia/Jakarta").endOf("month").format("YYYY-MM-DD HH:mm:ss");
-    
-            const [rowJumlahBelanjaBulanan] = await connKopsas.query(
-                `SELECT SUM(kasir.total) AS total
-                FROM kasir
-                WHERE kasir.kd_pelanggan = ?
-                AND kasir.tanggal BETWEEN ? AND ?`,
-                [dataPelanggan.kodePelanggan, startOfMonth, endOfMonth]
-            );
-            const jmlBelanja = (rowJumlahBelanjaBulanan as { total: number }[])[0];
-            const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
-            
-            const pelanggan = (rowPelanggan as { limitBelanja: number, kredit: number }[])[0]
-            const limitBelanja = Number(pelanggan.limitBelanja ?? 0);
-            const kredit = Number(pelanggan.kredit ?? 0);
-    
-            if (kredit === 0) {
-                await connection.rollback();
-                return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
-            }
-    
-            if (limitBelanja > 0 && totalBelanja > limitBelanja) {
-                await connection.rollback();
-                return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
-            }
+        const startOfMonth = moment().tz("Asia/Jakarta").startOf("month").format("YYYY-MM-DD HH:mm:ss");
+        const endOfMonth = moment().tz("Asia/Jakarta").endOf("month").format("YYYY-MM-DD HH:mm:ss");
+
+        const [rowJumlahBelanjaBulanan] = await connKopsas.query(
+            `SELECT SUM(kasir.total) AS total
+            FROM kasir
+            WHERE kasir.kd_pelanggan = ?
+            AND kasir.tanggal BETWEEN ? AND ?`,
+            [dataPelanggan.kodePelanggan, startOfMonth, endOfMonth]
+        );
+        const jmlBelanja = (rowJumlahBelanjaBulanan as { total: number }[])[0];
+        const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
+
+        if (limitBelanja > 0 && totalBelanja > limitBelanja) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
         }
 
         for (const item of dataKasir) {
@@ -90,24 +83,24 @@ export const inputKasirController = async (req: Request, res: Response) => {
 
             if (!dbItem) {
                 await connection.rollback();
-                return res.status(400).json({ 
-                    message: `Item dengan kode ${item.kodeItem} tidak ditemukan.` 
+                return res.status(400).json({
+                    message: `Item dengan kode ${item.kodeItem} tidak ditemukan.`
                 });
             }
 
             if (dbItem.stok < item.jumlah) {
                 await connection.rollback();
-                return res.status(400).json({ 
-                    message: `Stok "${dbItem.nama}" tidak mencukupi!` 
+                return res.status(400).json({
+                    message: `Stok "${dbItem.nama}" tidak mencukupi!`
                 });
             }
         }
-        
+
         const idTransaction = await generateIdTransaction();
         await connKopsas.query<RowDataPacket[]>(
             `INSERT INTO kasir 
             (id_transaksi, tanggal, kd_pelanggan, nama_pelanggan, total, user_buat, metode)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [idTransaction, startDate, dataPelanggan.kodePelanggan, dataPelanggan.namaPelanggan, total, userBuat, metode]
         )
 
@@ -147,6 +140,43 @@ export const updateKasirController = async (req: Request, res: Response) => {
         if(dataKasir.length === 0) {
             await connection.rollback();
             return res.status(400).json({ message: "Item belum dipilih" });
+        }
+
+        const tabelPelanggan = dataPelanggan?.sumberPelanggan === 'umum' ? 'pelanggan_umum' : 'pelanggan';
+
+        const [rowPelanggan] = await connKopsas.query(
+            `SELECT limit_belanja AS limitBelanja, kredit
+            FROM ${tabelPelanggan}
+            WHERE kode = ?`,
+            [dataPelanggan.kodePelanggan]
+        );
+
+        const pelanggan = (rowPelanggan as { limitBelanja: number, kredit: number }[])[0];
+        const limitBelanja = Number(pelanggan?.limitBelanja ?? 0);
+        const kredit = Number(pelanggan?.kredit ?? 0);
+
+        if (metode === 2 && kredit === 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Pelanggan tidak dapat melakukan pembayaran kredit" });
+        }
+
+        const startOfMonth = moment().tz("Asia/Jakarta").startOf("month").format("YYYY-MM-DD HH:mm:ss");
+        const endOfMonth = moment().tz("Asia/Jakarta").endOf("month").format("YYYY-MM-DD HH:mm:ss");
+
+        const [rowJumlahBelanjaBulanan] = await connKopsas.query(
+            `SELECT SUM(kasir.total) AS total
+            FROM kasir
+            WHERE kasir.kd_pelanggan = ?
+            AND kasir.tanggal BETWEEN ? AND ?
+            AND kasir.id_transaksi != ?`,
+            [dataPelanggan.kodePelanggan, startOfMonth, endOfMonth, idTransaksi]
+        );
+        const jmlBelanja = (rowJumlahBelanjaBulanan as { total: number }[])[0];
+        const totalBelanja = Number(jmlBelanja.total ?? 0) + Number(total ?? 0);
+
+        if (limitBelanja > 0 && totalBelanja > limitBelanja) {
+            await connection.rollback();
+            return res.status(400).json({ message: "Pelanggan sudah melebihi limit belanja" });
         }
 
         const [oldDetails] = await connection.query<RowDataPacket[]>(
