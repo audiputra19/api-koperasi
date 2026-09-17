@@ -11,24 +11,15 @@ const connPayroll =
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME_PAYROLL,
-
     timezone: '+07:00',
-
     waitForConnections: true,
-
-    // Batasi koneksi per instance Vercel
-    connectionLimit: 1,
-
+    connectionLimit: 2,
     queueLimit: 0,
-
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
-
-    // Lepaskan koneksi idle lebih cepat
-    idleTimeout: 5000,
-
+    idleTimeout: 60000,
     maxIdle: 1,
-  })
+})
 
 global.__connPayroll = connPayroll
 

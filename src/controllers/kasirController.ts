@@ -233,7 +233,7 @@ export const getKasirController = async (req: Request, res: Response) => {
 
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * FROM kasir ORDER BY id_transaksi`
+            `SELECT * FROM kasir ORDER BY id_transaksi DESC`
         );
         const kasir = rows as Kasir[];
 

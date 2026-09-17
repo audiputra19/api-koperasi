@@ -137,7 +137,7 @@ export const getPembelianController = async (req: Request, res: Response) => {
 
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * FROM pembelian ORDER BY id_transaksi`
+            `SELECT * FROM pembelian ORDER BY id_transaksi DESC`
         );
         const pembelian = rows as Pembelian[];
 
