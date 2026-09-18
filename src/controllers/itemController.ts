@@ -167,7 +167,7 @@ export const searchItemController = async (req: Request, res: Response) => {
 }
 
 export const deleteItemController = async (req: Request, res: Response) => {
-    const { kdItem } = req.body;
+    const { kode } = req.body;
 
     const connection = await connKopsas.getConnection();
 
@@ -175,7 +175,7 @@ export const deleteItemController = async (req: Request, res: Response) => {
         await connection.beginTransaction();
 
         await connection.query<RowDataPacket[]>(
-            `DELETE FROM items WHERE kode = ?`, [kdItem]
+            `DELETE FROM items WHERE kode = ?`, [kode]
         );
 
         await connection.commit();
