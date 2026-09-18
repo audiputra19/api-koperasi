@@ -6,6 +6,6 @@ const itemRouter = Router();
 itemRouter.post("/get-items", getItemController);
 itemRouter.post("/input-items", inputItemController);
 itemRouter.get("/search-items", searchItemController);
-itemRouter.get("/delete-items", deleteItemController);
+itemRouter.post("/delete-items", deleteItemController);
 
 export default itemRouter;
