@@ -165,3 +165,25 @@ export const searchItemController = async (req: Request, res: Response) => {
         res.status(400).json({ message: 'terjadi kesalahan pada server' });
     }
 }
+
+export const deleteItemController = async (req: Request, res: Response) => {
+    const { kdItem } = req.body;
+
+    const connection = await connKopsas.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        await connection.query<RowDataPacket[]>(
+            `DELETE FROM items WHERE kode = ?`, [kdItem]
+        );
+
+        await connection.commit();
+        res.status(200).json({ message: 'Data berhasil dihapus' });
+    } catch (error) {
+        await connection.rollback();
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    } finally {
+        connection.release();
+    }
+}

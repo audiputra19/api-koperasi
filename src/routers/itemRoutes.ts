@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { getItemController, inputItemController, searchItemController } from "../controllers/itemController";
+import { deleteItemController, getItemController, inputItemController, searchItemController } from "../controllers/itemController";
 
 const itemRouter = Router();
 
 itemRouter.post("/get-items", getItemController);
 itemRouter.post("/input-items", inputItemController);
 itemRouter.get("/search-items", searchItemController);
+itemRouter.get("/delete-items", deleteItemController);
 
 export default itemRouter;
