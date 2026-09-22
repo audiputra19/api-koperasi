@@ -187,3 +187,67 @@ export const deleteItemController = async (req: Request, res: Response) => {
         connection.release();
     }
 }
+
+export const getStockItemController = async (req: Request, res: Response) => {
+    const { kode, tanggal_awal, tanggal_akhir } = req.body;
+
+    if (!kode || !tanggal_awal || !tanggal_akhir) {
+        return res.status(400).json({ message: 'kode, tanggal_awal, dan tanggal_akhir wajib diisi' });
+    }
+
+    try {
+        const [pembelianRows] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT 
+                p.id_transaksi AS no_transaksi,
+                p.tanggal AS tanggal,
+                'Pembelian' AS keterangan,
+                pd.jumlah AS masuk,
+                0 AS keluar,
+                COALESCE(s.nama, '-') AS pelanggan
+            FROM pembelian p
+            INNER JOIN pembelian_detail pd ON pd.id_transaksi = p.id_transaksi
+            LEFT JOIN supplier s ON s.kode = p.kd_supplier
+            WHERE pd.kd_item = ?
+               AND DATE(p.tanggal) <= ?
+            ORDER BY p.tanggal DESC
+            LIMIT 1`,
+            [kode, tanggal_akhir]
+        );
+
+        const [kasirRows] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT 
+                k.id_transaksi AS no_transaksi,
+                k.tanggal AS tanggal,
+                'Penjualan' AS keterangan,
+                0 AS masuk,
+                kd.jumlah AS keluar,
+                COALESCE(k.nama_pelanggan, '-') AS pelanggan
+            FROM kasir k
+            INNER JOIN kasir_detail kd ON kd.id_transaksi = k.id_transaksi
+            WHERE kd.kd_item = ?
+               AND DATE(k.tanggal) BETWEEN ? AND ?
+            ORDER BY k.tanggal ASC`,
+            [kode, tanggal_awal, tanggal_akhir]
+        );
+
+        const combinedRows = [...pembelianRows, ...kasirRows];
+
+        let saldo = 0;
+        const kartuStok = combinedRows.map((row) => {
+            saldo += Number(row.masuk) - Number(row.keluar);
+            return {
+                no_transaksi: row.no_transaksi,
+                tanggal: row.tanggal,
+                keterangan: row.keterangan,
+                masuk: Number(row.masuk),
+                keluar: Number(row.keluar),
+                saldo,
+                pelanggan: row.pelanggan,
+            };
+        });
+
+        res.status(200).json({ data: kartuStok });
+    } catch (error) {
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+    }
+}
