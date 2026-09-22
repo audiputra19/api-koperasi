@@ -208,10 +208,8 @@ export const getStockItemController = async (req: Request, res: Response) => {
             INNER JOIN pembelian_detail pd ON pd.id_transaksi = p.id_transaksi
             LEFT JOIN supplier s ON s.kode = p.kd_supplier
             WHERE pd.kd_item = ?
-               AND DATE(p.tanggal) <= ?
-            ORDER BY p.tanggal DESC
-            LIMIT 1`,
-            [kode, tanggal_akhir]
+               AND DATE(p.tanggal) BETWEEN ? AND ?`,
+            [kode, tanggal_awal, tanggal_akhir]
         );
 
         const [kasirRows] = await connKopsas.query<RowDataPacket[]>(
@@ -225,12 +223,15 @@ export const getStockItemController = async (req: Request, res: Response) => {
             FROM kasir k
             INNER JOIN kasir_detail kd ON kd.id_transaksi = k.id_transaksi
             WHERE kd.kd_item = ?
-               AND DATE(k.tanggal) BETWEEN ? AND ?
-            ORDER BY k.tanggal ASC`,
+               AND DATE(k.tanggal) BETWEEN ? AND ?`,
             [kode, tanggal_awal, tanggal_akhir]
         );
 
-        const combinedRows = [...pembelianRows, ...kasirRows];
+        const combinedRows = [...pembelianRows, ...kasirRows].sort((a, b) => {
+            const dateA = new Date(a.tanggal).getTime();
+            const dateB = new Date(b.tanggal).getTime();
+            return dateA - dateB;
+        });
 
         let saldo = 0;
         const kartuStok = combinedRows.map((row) => {
