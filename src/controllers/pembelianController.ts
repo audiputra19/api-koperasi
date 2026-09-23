@@ -13,7 +13,7 @@ const generateIdTransaction = async () => {
     );
 
     let nextCode = 1;
-    if(rows.length > 0 && rows[0].maxCode) {
+    if (rows.length > 0 && rows[0].maxCode) {
         nextCode = rows[0].maxCode + 1;
     }
 
@@ -32,7 +32,7 @@ export const inputPembelianController = async (req: Request, res: Response) => {
     try {
         await connection.beginTransaction();
 
-        if(dataPembelian.length === 0) {
+        if (dataPembelian.length === 0) {
             await connection.rollback();
             return res.status(400).json({ message: "Item belum dipilih" });
         }
@@ -41,7 +41,7 @@ export const inputPembelianController = async (req: Request, res: Response) => {
         await connection.query<RowDataPacket[]>(
             `INSERT INTO pembelian 
             (id_transaksi, tanggal, kd_supplier, nama_supplier, total, user_buat, metode)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [idTransaction, startDate, dataSupplier.kodeSupplier, dataSupplier.namaSupplier, total, userBuat, metode]
         )
 
@@ -78,13 +78,13 @@ export const updatePembelianController = async (req: Request, res: Response) => 
     try {
         await connection.beginTransaction();
 
-        if(dataPembelian.length === 0) {
+        if (dataPembelian.length === 0) {
             await connection.rollback();
             return res.status(400).json({ message: "Item belum dipilih" });
         }
 
         const [oldDetails] = await connection.query<RowDataPacket[]>(
-            `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ?`,
+            `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ? FOR UPDATE`,
             [idTransaksi]
         );
 
@@ -98,8 +98,8 @@ export const updatePembelianController = async (req: Request, res: Response) => 
         await connection.query<RowDataPacket[]>(
             `UPDATE pembelian 
             SET tanggal = ?, kd_supplier = ?, nama_supplier = ?, total = ?, user_ubah = ?, metode = ? 
-            WHERE id_transaksi = ?`, 
-            [startDate, dataSupplier.kodeSupplier, dataSupplier.namaSupplier, total, userBuat, 
+            WHERE id_transaksi = ?`,
+            [startDate, dataSupplier.kodeSupplier, dataSupplier.namaSupplier, total, userBuat,
             metode, idTransaksi]
         )
 
@@ -173,9 +173,9 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
             WHERE id_transaksi = ? 
             ORDER BY nama_item`,
             [idTransaksi]
-        );   
+        );
         const PembelianDetail = rows as PembelianDetail[];
-        
+
         const dataPembelianDetail = PembelianDetail.map(item => {
             return {
                 barcode: item.barcode,
@@ -204,13 +204,13 @@ export const deletePembelianController = async (req: Request, res: Response) => 
         await connection.beginTransaction();
 
         const [oldDetails] = await connection.query<RowDataPacket[]>(
-            `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ?`,
+            `SELECT kd_item, jumlah FROM pembelian_detail WHERE id_transaksi = ? FOR UPDATE`,
             [idTransaksi]
         );
 
         for (const detail of oldDetails) {
             const [items] = await connection.query<RowDataPacket[]>(
-                `SELECT nama, stok FROM items WHERE kode = ?`,
+                `SELECT nama, stok FROM items WHERE kode = ? FOR UPDATE`,
                 [detail.kd_item]
             );
 
@@ -219,8 +219,8 @@ export const deletePembelianController = async (req: Request, res: Response) => 
             // Cek jika barang ada dan apakah stok mencukupi
             if (!currentItem || (currentItem.stok - detail.jumlah < 0)) {
                 await connection.rollback();
-                return res.status(200).json({ 
-                    message: `Transaksi tidak dapat dihapus! Stok "${currentItem?.nama || detail.kd_item}" tidak mencukupi.` 
+                return res.status(200).json({
+                    message: `Transaksi tidak dapat dihapus! Stok "${currentItem?.nama || detail.kd_item}" tidak mencukupi.`
                 });
             }
         }
@@ -248,7 +248,6 @@ export const deletePembelianController = async (req: Request, res: Response) => 
         console.error("Error pada deletePembelianController:", error);
         return res.status(500).json({ message: 'Terjadi kesalahan pada server' });
     } finally {
-        // PENTING: Wajib dilepas agar connection pool tidak habis!
         connection.release();
     }
 }
@@ -261,10 +260,34 @@ export const deletePembelianDetailController = async (req: Request, res: Respons
     try {
         await connection.beginTransaction();
 
+        const [rows] = await connection.query<RowDataPacket[]>(
+            `SELECT jumlah FROM pembelian_detail WHERE id_transaksi = ? AND kd_item = ? FOR UPDATE`,
+            [idTransaksi, kdItem]
+        );
+        const detail = rows[0];
+
+        if (!detail) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'Detail transaksi tidak ditemukan' });
+        }
+
+        const [itemRows] = await connection.query<RowDataPacket[]>(
+            `SELECT nama, stok FROM items WHERE kode = ? FOR UPDATE`,
+            [kdItem]
+        );
+        const currentItem = itemRows[0];
+
+        if (!currentItem || (currentItem.stok - detail.jumlah < 0)) {
+            await connection.rollback();
+            return res.status(200).json({
+                message: `Detail tidak dapat dihapus! Stok "${currentItem?.nama || kdItem}" tidak mencukupi.`
+            });
+        }
+
         await connection.query<RowDataPacket[]>(
             `UPDATE pembelian 
             SET total = total - ? 
-            WHERE id_transaksi = ?`, 
+            WHERE id_transaksi = ?`,
             [total, idTransaksi]
         );
 
@@ -272,11 +295,16 @@ export const deletePembelianDetailController = async (req: Request, res: Respons
             `DELETE FROM pembelian_detail WHERE id_transaksi = ? AND kd_item = ?`, [idTransaksi, kdItem]
         );
 
+        await connection.query<RowDataPacket[]>(
+            `UPDATE items SET stok = stok - ? WHERE kode = ?`,
+            [detail.jumlah, kdItem]
+        );
+
         await connection.commit();
         res.status(200).json({ message: 'Data berhasil dihapus' });
     } catch (error) {
         await connection.rollback();
-        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });
     } finally {
         connection.release();
     }
@@ -298,13 +326,13 @@ export const inputHargaItem = async (req: Request, res: Response) => {
         await connKopsas.query<RowDataPacket[]>(
             `INSERT INTO harga_item 
             (kd_item, tanggal, harga_beli, harga_jual)
-            VALUES (?, ?, ?, ?)`, 
+            VALUES (?, ?, ?, ?)`,
             [kdItem, date, hargaBeli, hargaJual]
-        ) 
+        )
 
         res.status(200).json({ message: 'Harga berhasil diupdate' });
     } catch (error) {
-        res.status(400).json({ message: 'Terjadi kesalahan pada server' }); 
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });
     }
 }
 
@@ -319,10 +347,10 @@ export const getHargaItem = async (req: Request, res: Response) => {
             WHERE hi.kd_item = ? 
             ORDER BY hi.tanggal DESC`,
             [kdItem]
-        );  
+        );
 
         res.status(200).json(rows);
     } catch (error) {
-        res.status(400).json({ message: 'Terjadi kesalahan pada server' }); 
+        res.status(400).json({ message: 'Terjadi kesalahan pada server' });
     }
 }
