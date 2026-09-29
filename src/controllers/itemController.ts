@@ -127,6 +127,7 @@ export const getItemController = async (req: Request, res: Response) => {
 
         res.status(200).json(items);
     } catch (error) {
+        console.error('getItemController error:', error);
         res.status(400).json({ message: 'terjadi kesalahan pada server' });
     }
 }
@@ -227,7 +228,23 @@ export const getStockItemController = async (req: Request, res: Response) => {
             [kode, tanggal_awal, tanggal_akhir]
         );
 
-        const combinedRows = [...pembelianRows, ...kasirRows].sort((a, b) => {
+        // SON (Stok Opname): selisih positif = masuk, selisih negatif = keluar
+        const [sonRows] = await connKopsas.query<RowDataPacket[]>(
+            `SELECT 
+                s.id_son AS no_transaksi,
+                s.tanggal AS tanggal,
+                'Stok Opname' AS keterangan,
+                CASE WHEN sd.selisih > 0 THEN sd.selisih ELSE 0 END AS masuk,
+                CASE WHEN sd.selisih < 0 THEN ABS(sd.selisih) ELSE 0 END AS keluar,
+                COALESCE(s.user_buat, '-') AS pelanggan
+            FROM son s
+            INNER JOIN son_detail sd ON sd.id_son = s.id_son
+            WHERE sd.kd_item = ?
+               AND DATE(s.tanggal) BETWEEN ? AND ?`,
+            [kode, tanggal_awal, tanggal_akhir]
+        );
+
+        const combinedRows = [...pembelianRows, ...kasirRows, ...sonRows].sort((a, b) => {
             const dateA = new Date(a.tanggal).getTime();
             const dateB = new Date(b.tanggal).getTime();
             return dateA - dateB;

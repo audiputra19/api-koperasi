@@ -11,6 +11,7 @@ import PembelianRouter from "./routers/pembellianRoutes";
 import laporanRouter from "./routers/laporanRoutes";
 import dashboardRouter from "./routers/dashboardRoutes";
 import hakAksesRouter from "./routers/hakAksesRoutes";
+import sonRouter from "./routers/sonRoutes";
 
 const app = express();
 
@@ -30,12 +31,13 @@ app.use("/", PembelianRouter);
 app.use("/", laporanRouter);
 app.use("/", dashboardRouter);
 app.use("/", hakAksesRouter);
+app.use("/", sonRouter);
 
 app.get("/", (req: Request, res: Response) => {
     res.send("welcome");
 });
 
-const PORT = process.env.PORT;
-app.listen(PORT, () => {
+const PORT = Number(process.env.PORT) || 3000;
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
 });
