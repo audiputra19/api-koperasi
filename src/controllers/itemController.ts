@@ -204,6 +204,7 @@ export const getStockItemController = async (req: Request, res: Response) => {
                 'Pembelian' AS keterangan,
                 pd.jumlah AS masuk,
                 0 AS keluar,
+                NULL AS saldo_son,
                 COALESCE(s.nama, '-') AS pelanggan
             FROM pembelian p
             INNER JOIN pembelian_detail pd ON pd.id_transaksi = p.id_transaksi
@@ -220,6 +221,7 @@ export const getStockItemController = async (req: Request, res: Response) => {
                 'Penjualan' AS keterangan,
                 0 AS masuk,
                 kd.jumlah AS keluar,
+                NULL AS saldo_son,
                 COALESCE(k.nama_pelanggan, '-') AS pelanggan
             FROM kasir k
             INNER JOIN kasir_detail kd ON kd.id_transaksi = k.id_transaksi
@@ -228,7 +230,8 @@ export const getStockItemController = async (req: Request, res: Response) => {
             [kode, tanggal_awal, tanggal_akhir]
         );
 
-        // SON (Stok Opname): selisih positif = masuk, selisih negatif = keluar
+        // SON: masuk/keluar tetap ditampilkan dari selisih (untuk informasi),
+        // tapi saldo di-reset ke jumlah fisik hasil opname
         const [sonRows] = await connKopsas.query<RowDataPacket[]>(
             `SELECT 
                 s.id_son AS no_transaksi,
@@ -236,6 +239,7 @@ export const getStockItemController = async (req: Request, res: Response) => {
                 'Stok Opname' AS keterangan,
                 CASE WHEN sd.selisih > 0 THEN sd.selisih ELSE 0 END AS masuk,
                 CASE WHEN sd.selisih < 0 THEN ABS(sd.selisih) ELSE 0 END AS keluar,
+                sd.stok_fisik AS saldo_son,
                 COALESCE(s.user_buat, '-') AS pelanggan
             FROM son s
             INNER JOIN son_detail sd ON sd.id_son = s.id_son
@@ -252,7 +256,13 @@ export const getStockItemController = async (req: Request, res: Response) => {
 
         let saldo = 0;
         const kartuStok = combinedRows.map((row) => {
-            saldo += Number(row.masuk) - Number(row.keluar);
+            if (row.keterangan === 'Stok Opname' && row.saldo_son !== null) {
+                // RESET saldo sesuai jumlah SON
+                saldo = Number(row.saldo_son);
+            } else {
+                saldo += Number(row.masuk) - Number(row.keluar);
+            }
+
             return {
                 no_transaksi: row.no_transaksi,
                 tanggal: row.tanggal,
@@ -266,6 +276,7 @@ export const getStockItemController = async (req: Request, res: Response) => {
 
         res.status(200).json({ data: kartuStok });
     } catch (error) {
-        res.status(400).json({ message: 'Terjadi kesalahan pada server' });  
+        console.error(error);
+        res.status(500).json({ message: 'Terjadi kesalahan pada server' });
     }
 }
