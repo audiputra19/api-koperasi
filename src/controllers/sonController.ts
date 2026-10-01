@@ -144,7 +144,6 @@ export const editSonController = async (req: Request, res: Response) => {
     try {
         await connection.beginTransaction();
 
-        // Pastikan SON ada (dikunci selama transaksi)
         const [sonRows] = await connection.query<RowDataPacket[]>(
             `SELECT id_son FROM son WHERE id_son = ? FOR UPDATE`,
             [sonNumber]
