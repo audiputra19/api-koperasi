@@ -94,9 +94,90 @@ export const inputItemController = async (req: Request, res: Response) => {
     }
 }
 
+const syncStokDariKartuStok = async () => {
+    const connection = await connKopsas.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const [movements] = await connection.query<RowDataPacket[]>(
+            `SELECT m.kd_item, m.masuk, m.keluar, m.saldo_son
+            FROM (
+                SELECT pd.kd_item, p.tanggal, pd.jumlah AS masuk, 0 AS keluar,
+                    NULL AS saldo_son, 1 AS urut
+                FROM pembelian_detail pd
+                JOIN pembelian p ON p.id_transaksi = pd.id_transaksi
+                UNION ALL
+                SELECT kd.kd_item, k.tanggal, 0, kd.jumlah, NULL, 2
+                FROM kasir_detail kd
+                JOIN kasir k ON k.id_transaksi = kd.id_transaksi
+                UNION ALL
+                SELECT sd.kd_item, s.tanggal, 0, 0, sd.stok_fisik, 3
+                FROM son_detail sd
+                JOIN son s ON s.id_son = sd.id_son
+            ) m
+            JOIN (
+                SELECT sd.kd_item, MAX(s.tanggal) AS last_son
+                FROM son_detail sd
+                JOIN son s ON s.id_son = sd.id_son
+                GROUP BY sd.kd_item
+            ) ls ON ls.kd_item = m.kd_item
+            WHERE m.tanggal >= ls.last_son
+            ORDER BY m.kd_item, m.tanggal, m.urut`
+        );
+
+        // Hitung saldo per item; hanya item yang punya SON yang dianggap valid
+        const computed = new Map<string, { saldo: number; hasSon: boolean }>();
+
+        for (const row of movements) {
+            const kode = row.kd_item as string;
+            const state = computed.get(kode) ?? { saldo: 0, hasSon: false };
+
+            if (row.saldo_son !== null) {
+                state.saldo = Number(row.saldo_son);   // reset sesuai SON
+                state.hasSon = true;
+            } else {
+                state.saldo += Number(row.masuk) - Number(row.keluar);
+            }
+            computed.set(kode, state);
+        }
+
+        const [itemRows] = await connection.query<RowDataPacket[]>(
+            `SELECT kode, stok FROM items`
+        );
+
+        for (const item of itemRows) {
+            const state = computed.get(item.kode);
+            if (!state || !state.hasSon) continue;   // tanpa SON: jangan disentuh
+
+            const delta = state.saldo - Number(item.stok);
+            if (delta !== 0) {
+                // console.warn(`Koreksi stok ${item.kode}: ${item.stok} -> ${state.saldo}`);
+                await connection.query(
+                    `UPDATE items SET stok = stok + ? WHERE kode = ?`,
+                    [delta, item.kode]
+                );
+            }
+        }
+
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+};
+
 export const getItemController = async (req: Request, res: Response) => {
 
     try {
+        try {
+            await syncStokDariKartuStok();
+        } catch (syncError) {
+            console.error('syncStokDariKartuStok error:', syncError);
+        }
+
         const [rows] = await connKopsas.query<RowDataPacket[]>(
             `SELECT 
                 i.kode, 
