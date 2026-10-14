@@ -48,9 +48,9 @@ export const inputItemController = async (req: Request, res: Response) => {
         if (rowsItem.length > 0) {
             await conn.query(
                 `UPDATE items 
-                SET barcode = ?, nama = ?, /* stok = ?, */ satuan = ?, rak = ?, jenis = ?, stok_minimal = ?, status = ?
+                SET barcode = ?, nama = ?, satuan = ?, rak = ?, jenis = ?, stok_minimal = ?, status = ?
                 WHERE kode = ?`,
-                [barcode, nama, /* stok, */ satuan, rak, jenis, stokMinimal, status, kdItem]
+                [barcode, nama, satuan, rak, jenis, stokMinimal, status, kdItem]
             );
 
             if (hargaBeli > 0 && hargaJual > 0) {
@@ -69,9 +69,9 @@ export const inputItemController = async (req: Request, res: Response) => {
             }
 
             await conn.query(
-                `INSERT INTO items (kode, barcode, nama, /* stok, */ satuan, rak, jenis, stok_minimal, status) 
-                VALUES (?, ?, ?, /* ?, */ ?, ?, ?, ?, ?)`,
-                [kode, barcode, nama, /* stok, */ satuan, rak, jenis, stokMinimal, status]
+                `INSERT INTO items (kode, barcode, nama, satuan, rak, jenis, stok_minimal, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [kode, barcode, nama, satuan, rak, jenis, stokMinimal, status]
             );
 
             if (hargaBeli > 0 && hargaJual > 0) {
