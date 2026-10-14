@@ -69,8 +69,8 @@ export const inputItemController = async (req: Request, res: Response) => {
             }
 
             await conn.query(
-                `INSERT INTO items (kode, barcode, nama, satuan, rak, jenis, stok_minimal, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO items (kode, barcode, nama, stok, satuan, rak, jenis, stok_minimal, status) 
+                VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?)`,
                 [kode, barcode, nama, satuan, rak, jenis, stokMinimal, status]
             );
 
