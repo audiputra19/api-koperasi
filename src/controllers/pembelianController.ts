@@ -136,8 +136,21 @@ export const updatePembelianController = async (req: Request, res: Response) => 
 export const getPembelianController = async (req: Request, res: Response) => {
 
     try {
+        const { tglDari, tglSampai } = req.body ?? {};
+        const formatTanggal = /^\d{4}-\d{2}-\d{2}$/;
+
+        const now = new Date();
+        const hariIni = new Date(now.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const awalBulan = `${hariIni.slice(0, 8)}01`;
+
+        const dari = formatTanggal.test(tglDari) ? tglDari : awalBulan;
+        const sampai = formatTanggal.test(tglSampai) ? tglSampai : hariIni;
+
         const [rows] = await connKopsas.query<RowDataPacket[]>(
-            `SELECT * FROM pembelian ORDER BY id_transaksi DESC`
+            `SELECT * FROM pembelian
+             WHERE tanggal >= ? AND tanggal < DATE_ADD(?, INTERVAL 1 DAY)
+             ORDER BY id_transaksi DESC`,
+            [dari, sampai]
         );
         const pembelian = rows as Pembelian[];
 
