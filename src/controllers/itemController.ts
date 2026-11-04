@@ -33,10 +33,28 @@ export const inputItemController = async (req: Request, res: Response) => {
         return res.status(400).json({ message: 'Semua field wajib diisi!' });
     }
 
+    const barcodeFinal = typeof barcode === 'string' && barcode.trim() !== ''
+        ? barcode.trim()
+        : null;
+
     const conn = await connKopsas.getConnection();
 
     try {
         await conn.beginTransaction();
+
+        if (barcodeFinal) {
+            const [rowsBarcode] = await conn.query<RowDataPacket[]>(
+                `SELECT kode, nama FROM items WHERE barcode = ? AND kode <> ? LIMIT 1`,
+                [barcodeFinal, kdItem ?? '']
+            );
+
+            if (rowsBarcode.length > 0) {
+                await conn.rollback();
+                return res.status(409).json({
+                    message: `Barcode sudah digunakan oleh item "${rowsBarcode[0].nama}" (${rowsBarcode[0].kode})`
+                });
+            }
+        }
 
         const kode = await generateItemCode();
 
