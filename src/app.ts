@@ -16,9 +16,12 @@ import sonRouter from "./routers/sonRoutes";
 const app = express();
 
 app.use(cors({
-     origin: 'https://koperasi-next-app.vercel.app'
-    // origin: 'http://localhost:3000'
-    // origin: 'https://koperasi-app-omega.vercel.app'
+    origin: [
+        'https://koperasi-next-app.vercel.app',
+        'http://localhost:3000'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
