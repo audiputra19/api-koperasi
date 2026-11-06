@@ -45,18 +45,20 @@ export const inputPembelianController = async (req: Request, res: Response) => {
             [idTransaction, startDate, dataSupplier.kodeSupplier, dataSupplier.namaSupplier, total, userBuat, metode]
         )
 
-        for (const item of dataPembelian) {
-            await connection.query<RowDataPacket[]>(
+        for (let i = 0; i < dataPembelian.length; i++) {
+            const item = dataPembelian[i];
+            await connection.query(
                 `INSERT INTO pembelian_detail
-                (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [idTransaction, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
-            )
+                (id_transaksi, no, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [idTransaction, i + 1, item.kodeItem, item.namaItem,
+                item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
+            );
 
-            await connection.query<RowDataPacket[]>(
+            await connection.query(
                 `UPDATE items SET stok = stok + ? WHERE kode = ?`,
                 [item.jumlah, item.kodeItem]
-            )
+            );
         }
 
         await connection.commit();
@@ -108,18 +110,20 @@ export const updatePembelianController = async (req: Request, res: Response) => 
             [idTransaksi]
         )
 
-        for (const item of dataPembelian) {
-            await connection.query<RowDataPacket[]>(
+        for (let i = 0; i < dataPembelian.length; i++) {
+            const item = dataPembelian[i];
+            await connection.query(
                 `INSERT INTO pembelian_detail
-                (id_transaksi, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [idTransaksi, item.kodeItem, item.namaItem, item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
-            )
+                (id_transaksi, no, kd_item, nama_item, jenis, jumlah, satuan, harga, expired_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [idTransaksi, i + 1, item.kodeItem, item.namaItem,
+                item.jenis, item.jumlah, item.satuan, item.harga, item.expiredDate]
+            );
 
-            await connection.query<RowDataPacket[]>(
+            await connection.query(
                 `UPDATE items SET stok = stok + ? WHERE kode = ?`,
                 [item.jumlah, item.kodeItem]
-            )
+            );
         }
 
         await connection.commit();
@@ -179,12 +183,12 @@ export const getPembelianDetailController = async (req: Request, res: Response) 
     try {
         const [rows] = await connKopsas.query<RowDataPacket[]>(
             `SELECT pembelian_detail.id_transaksi, items.barcode, pembelian_detail.kd_item, pembelian_detail.nama_item, 
-                    pembelian_detail.jenis, pembelian_detail.jumlah, pembelian_detail.satuan, pembelian_detail.harga,
-                    pembelian_detail.expired_date
+                pembelian_detail.jenis, pembelian_detail.jumlah, pembelian_detail.satuan, pembelian_detail.harga,
+                pembelian_detail.expired_date
             FROM pembelian_detail 
             INNER JOIN items ON items.kode = pembelian_detail.kd_item 
             WHERE id_transaksi = ? 
-            ORDER BY nama_item`,
+            ORDER BY pembelian_detail.no IS NULL, CAST(pembelian_detail.no AS UNSIGNED), pembelian_detail.nama_item`,
             [idTransaksi]
         );
         const PembelianDetail = rows as PembelianDetail[];
